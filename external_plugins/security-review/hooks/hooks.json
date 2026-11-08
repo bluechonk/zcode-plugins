@@ -1,0 +1,21 @@
+{
+  "description": "security-review：文件写入后做一次正则安全模式检查，命中即注入提示。",
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "process",
+            "command": "node",
+            "args": [
+              "${ZCODE_PLUGIN_ROOT}/hooks/security-review.mjs"
+            ],
+            "timeoutMs": 5000,
+            "statusMessage": "security-review：检查本次改动…"
+          }
+        ]
+      }
+    ]
+  }
+}

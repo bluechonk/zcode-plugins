@@ -1,10 +1,11 @@
-# CI：仓库结构门禁。
+# CI：仓库结构与构建产物门禁。
 #
-# 只跑 scripts/validate.py（取自 zai-org/zcode-plugins），校验 marketplace.json、
-# 各插件 manifest 与目录约定是否自洽：条目字段、source 形态、目录名、i18n、category。
+# 三件事，任何一件红了都不许合：
+#   1. TypeScript 类型检查
+#   2. 插件产物与源码一致（防「改了 src 忘了 npm run build」）
+#   3. scripts/validate.py 校验 marketplace.json、各插件 manifest 与目录约定
 #
-# 不引 actions/setup-python：脚本只用 Python 标准库，ubuntu-latest 自带的 python3
-# 足够，少一个会随版本漂移失效的 action。
+# job 名 validate 是 main 分支保护里的必需检查，改名会让所有 PR 卡在「等待状态上报」。
 name: CI
 
 on:
@@ -26,9 +27,24 @@ jobs:
   validate:
     name: validate
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: 安装依赖
+        run: npm ci
+
+      - name: 类型检查
+        run: npm run typecheck
+
+      - name: 插件产物未漂移
+        run: npm run build -- --check
+
       - name: 校验市场与插件清单
         run: |
           python3 --version

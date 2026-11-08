@@ -16,14 +16,31 @@ external_plugins/                      社区插件（官方约定的伙伴/社�
     hooks/hooks.json                   hook 注册（PreToolUse）
     hooks/plan-gate.mjs                门禁脚本（observe / enforce 双模式）
     skills/plan-gate/SKILL.md          说明被拦截时怎么办
+  security-review/                     安全审查
+    src/index.ts                       TypeScript 源码（唯一手改处）
+    hooks/security-review.mjs          构建产物（不要手改）
 assets/                                条目图标（catalog 的 icon 指向各自 raw 地址）
-  deepseek-web-search/icon.png
-  plan-gate/icon.png
 scripts/validate.py                    市场与插件清单校验（取自 zai-org/zcode-plugins，Apache-2.0）
+scripts/build.mjs                      插件构建：src/*.ts → hooks/*.mjs
+package.json / tsconfig.json           构建管线（devDependencies 仅构建期需要）
 LICENSE
 ```
 
-校验：
+## 构建
+
+带 `src/` 的插件用 TypeScript 写，构建成单文件 ESM 落在 `hooks/`。产物入库，因为 ZCode 直接执行插件目录里的文件、不做任何编译。
+
+```sh
+npm install
+npm run build              # 写盘
+npm run build -- --check   # 只比对，产物与源码不一致则非零退出
+npm run typecheck
+npm run check              # typecheck + 漂移检查 + validate.py
+```
+
+**产物不要手改**，改 `src/` 后重跑构建；CI 会跑 `--check` 挡住漂移。单文件产物而非多文件，是为了避免插件装进 cache 目录后的相对 import 路径问题。
+
+## 条目校验
 
 ```sh
 python3 scripts/validate.py
@@ -37,11 +54,14 @@ python3 scripts/validate.py
 | --- | --- | --- | --- |
 | DeepSeek 联网搜索 | `deepseek-web-search` | DeepSeek 官方联网搜索与网页抓取 | Node.js >= 18；`DEEPSEEK_API_KEY` |
 | 规划门禁 | `plan-gate` | 本轮未规划时拦截会改状态的工具调用 | Node.js >= 22.5（内置 `node:sqlite`） |
+| 安全审查 | `security-review` | 编辑后即时扫一遍新增内容，命中安全模式即提示 | Node.js >= 22 |
 
 各自的组件、用法与配置见对应插件的 README：
 
 - [external_plugins/deepseek-web-search/README.md](external_plugins/deepseek-web-search/README.md)
 - [external_plugins/plan-gate/README.md](external_plugins/plan-gate/README.md)
+- [external_plugins/security-review/README.md](external_plugins/security-review/README.md)
+
 
 
 ## 添加为 ZCode 插件市场

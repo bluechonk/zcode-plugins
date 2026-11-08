@@ -39,6 +39,33 @@
         "cli",
         "rag"
       ]
+    },
+    {
+      "name": "plan-gate",
+      "source": "./external_plugins/plan-gate",
+      "version": "0.1.0",
+      "description": "Deny state-changing tools until the current turn is planned with TodoWrite, and mirror the todo list to disk.",
+      "description_i18n": {
+        "en": "Deny state-changing tools until the current turn is planned with TodoWrite, and mirror the todo list to disk.",
+        "zh-CN": "本轮未规划时拦截会改状态的工具，并把待办清单镜像到磁盘。"
+      },
+      "displayName": "Plan Gate",
+      "displayName_i18n": {
+        "en": "Plan Gate",
+        "zh-CN": "规划门禁"
+      },
+      "author": {
+        "name": "bluechonk",
+        "url": "https://github.com/bluechonk"
+      },
+      "category": "utilities",
+      "icon": "https://raw.githubusercontent.com/bluechonk/zcode-plugins/main/assets/plan-gate/icon.png",
+      "tags": [
+        "hooks",
+        "todo",
+        "planning",
+        "gate"
+      ]
     }
   ]
 }

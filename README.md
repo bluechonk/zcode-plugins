@@ -6,14 +6,19 @@ bluechonk 的 ZCode 插件市场。仓库根即市场根，`marketplace.json` �
 
 ```text
 marketplace.json                       市场清单（catalog name: bluechonk-plugins）
-external_plugins/
-  deepseek-web-search/                 社区插件（官方约定的伙伴/社区插件位置）
+external_plugins/                      社区插件（官方约定的伙伴/社区插件位置）
+  deepseek-web-search/                 DeepSeek 联网搜索
     .zcode-plugin/plugin.json          插件清单
     cli/                               零依赖 CLI（search / fetch / doctor）
     commands/                          斜杠命令
     skills/                            技能
-assets/
-  deepseek-web-search/icon.png         条目图标（catalog 的 icon 指向它的 raw 地址）
+  plan-gate/                           规划门禁
+    hooks/hooks.json                   hook 注册（PreToolUse）
+    hooks/plan-gate.mjs                门禁脚本（observe / enforce 双模式）
+    skills/plan-gate/SKILL.md          说明被拦截时怎么办
+assets/                                条目图标（catalog 的 icon 指向各自 raw 地址）
+  deepseek-web-search/icon.png
+  plan-gate/icon.png
 scripts/validate.py                    市场与插件清单校验（取自 zai-org/zcode-plugins，Apache-2.0）
 LICENSE
 ```
@@ -31,8 +36,13 @@ python3 scripts/validate.py
 | 显示名 | 插件名 | 作用 | 前置条件 |
 | --- | --- | --- | --- |
 | DeepSeek 联网搜索 | `deepseek-web-search` | DeepSeek 官方联网搜索与网页抓取 | Node.js >= 18；`DEEPSEEK_API_KEY` |
+| 规划门禁 | `plan-gate` | 本轮未规划时拦截会改状态的工具调用 | Node.js >= 22.5（内置 `node:sqlite`） |
 
-插件的组件、CLI 用法、接口说明与退出码见 [external_plugins/deepseek-web-search/README.md](external_plugins/deepseek-web-search/README.md)。
+各自的组件、用法与配置见对应插件的 README：
+
+- [external_plugins/deepseek-web-search/README.md](external_plugins/deepseek-web-search/README.md)
+- [external_plugins/plan-gate/README.md](external_plugins/plan-gate/README.md)
+
 
 ## 添加为 ZCode 插件市场
 

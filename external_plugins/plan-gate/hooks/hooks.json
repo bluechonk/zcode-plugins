@@ -1,0 +1,21 @@
+{
+  "description": "plan-gate：工具执行前的规划门禁。当前为观察态，只写日志、不拦截。",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "type": "process",
+            "command": "node",
+            "args": [
+              "${ZCODE_PLUGIN_ROOT}/hooks/plan-gate.mjs"
+            ],
+            "timeoutMs": 5000,
+            "statusMessage": "plan-gate：检查本轮是否已规划…"
+          }
+        ]
+      }
+    ]
+  }
+}

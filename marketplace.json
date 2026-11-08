@@ -1,0 +1,44 @@
+{
+  "name": "bluechonk-plugins",
+  "description": "bluechonk 的 ZCode 插件市场。",
+  "description_i18n": {
+    "en": "bluechonk's ZCode plugin marketplace.",
+    "zh-CN": "bluechonk 的 ZCode 插件市场。"
+  },
+  "owner": {
+    "name": "bluechonk",
+    "url": "https://github.com/bluechonk"
+  },
+  "plugins": [
+    {
+      "name": "deepseek-web-search",
+      "source": "./external_plugins/deepseek-web-search",
+      "version": "0.1.0",
+      "description": "DeepSeek official web search and page fetch: zero-dependency CLI plus matching commands, skills and MCP servers.",
+      "description_i18n": {
+        "en": "DeepSeek official web search and page fetch: zero-dependency CLI plus matching commands, skills and MCP servers.",
+        "zh-CN": "DeepSeek 官方联网搜索与网页抓取：零依赖 CLI，并配套 command、skill 与 MCP 服务。"
+      },
+      "displayName": "DeepSeek 联网搜索",
+      "displayName_i18n": {
+        "en": "DeepSeek Web Search",
+        "zh-CN": "DeepSeek 联网搜索"
+      },
+      "author": {
+        "name": "bluechonk",
+        "url": "https://github.com/bluechonk"
+      },
+      "category": "developer-tools",
+      "icon": "https://raw.githubusercontent.com/bluechonk/zcode-plugins/main/assets/deepseek-web-search/icon.png",
+      "homepage": "https://api-docs.deepseek.com/zh-cn/guides/search",
+      "tags": [
+        "deepseek",
+        "web-search",
+        "fetch",
+        "mcp",
+        "cli",
+        "rag"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,35 @@
+# CI：仓库结构门禁。
+#
+# 只跑 scripts/validate.py（取自 zai-org/zcode-plugins），校验 marketplace.json、
+# 各插件 manifest 与目录约定是否自洽：条目字段、source 形态、目录名、i18n、category。
+#
+# 不引 actions/setup-python：脚本只用 Python 标准库，ubuntu-latest 自带的 python3
+# 足够，少一个会随版本漂移失效的 action。
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# 校验只需要读仓库
+permissions:
+  contents: read
+
+# 同一分支/PR 的旧运行自动取消，避免连续推送堆积
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - name: 校验市场与插件清单
+        run: |
+          python3 --version
+          python3 scripts/validate.py

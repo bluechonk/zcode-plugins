@@ -1,0 +1,30 @@
+{
+  "name": "deepseek-web-search",
+  "version": "0.1.0",
+  "description": "Zero-dependency CLI (dws) for DeepSeek official web search and page fetch APIs.",
+  "author": {
+    "name": "bluechonk",
+    "url": "https://github.com/bluechonk"
+  },
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "dws": "./src/index.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "keywords": [
+    "deepseek",
+    "dws",
+    "web-search",
+    "search",
+    "fetch",
+    "mcp",
+    "cli"
+  ]
+}

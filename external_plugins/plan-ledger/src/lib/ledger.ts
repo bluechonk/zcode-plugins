@@ -8,9 +8,15 @@
  * 也就不存在「模型忘了更新导致台账腐烂」的问题。
  */
 
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { GoalInfo, TodoItem } from "./zcode-db";
+
+/** 活动线最多保留多少条：再往前的对当前决策没有参考价值，只是噪音 */
+const MAX_ACTIVITY_LINES = 15;
+
+/** 每个项目保留多少份台账：超出按修改时间删最旧，避免 .zcode/plans/ 无限累积 */
+const MAX_LEDGERS = 200;
 
 export interface LedgerEvent {
   at: string;
@@ -87,7 +93,7 @@ export function renderLedger(input: LedgerInput): string {
 
   if (input.events.length > 0) {
     lines.push("## 活动线", "", "| 时间 | 事件 | 变化 |", "| --- | --- | --- |");
-    for (const e of input.events.slice(-15)) {
+    for (const e of input.events.slice(-MAX_ACTIVITY_LINES)) {
       lines.push(`| ${e.at} | ${e.event} | ${e.detail} |`);
     }
     lines.push("");
@@ -109,5 +115,27 @@ export function writeLedger(path: string, content: string): void {
     writeFileSync(path, content, "utf8");
   } catch {
     // 台账写不进去只影响可读性，不影响任何门禁判定
+  }
+}
+
+/**
+ * 清理旧台账：同一目录下的 progress-*.md 超过 MAX_LEDGERS 份时按修改时间删最旧。
+ *
+ * 为什么必须做：每个会话产生一份，长期开发会在 .zcode/plans/ 里堆到上千份，
+ * 而它们只是派生物——没有任何机制会再读它们。
+ */
+export function pruneLedgers(plansDir: string, max: number = MAX_LEDGERS): void {
+  try {
+    const stale = readdirSync(plansDir)
+      .filter((f) => /^progress-.+\.md$/u.test(f))
+      .map((f) => {
+        const p = join(plansDir, f);
+        return { p, mtime: statSync(p).mtimeMs };
+      })
+      .sort((a, b) => b.mtime - a.mtime)
+      .slice(max);
+    for (const { p } of stale) rmSync(p, { force: true });
+  } catch {
+    // 清理失败只影响磁盘占用，不影响台账本身
   }
 }

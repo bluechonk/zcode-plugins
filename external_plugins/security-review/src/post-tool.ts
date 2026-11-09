@@ -111,6 +111,30 @@ const RULES: readonly Rule[] = [
     fix: "改为白名单来源，或明确说明为何需要放开",
     pattern: /(Access-Control-Allow-Origin["'`]?\s*[:,]\s*["'`]\*|origin\s*:\s*["'`]\*["'`])/i,
   },
+  {
+    id: "jwt-weak-secret",
+    what: "疑似把 JWT 密钥写成字面量",
+    fix: "密钥从环境变量读取，至少 32 字节，不要用示例值",
+    pattern: /\b(jwt[_-]?secret|jwt[_-]?key|JWT_SECRET|JWT_KEY)\b\s*[:=]\s*["'`][A-Za-z0-9_\-.]{8,}["'`]/i,
+  },
+  {
+    id: "hardcoded-iv-salt",
+    what: "疑似硬编码 IV 或盐",
+    fix: "IV 每次随机生成并随密文存储；盐用 crypto.randomBytes 生成",
+    pattern: /\b(iv|salt|nonce)\b\s*[:=]\s*["'`][A-Za-z0-9+/=]{8,}["'`]/i,
+  },
+  {
+    id: "child-process-concat",
+    what: "child_process 用字符串拼接构造命令",
+    fix: "改用 execFile / spawn 的数组参数，避免 shell 注入",
+    pattern: /\bexec\s*\(\s*[`"][^`"]*(?:\$\{|\+|"+)/,
+  },
+  {
+    id: "unsafe-deserialize",
+    what: "不安全的反序列化",
+    fix: "改用 JSON 或带 schema 校验的解析；yaml 用 SafeLoader",
+    pattern: /\byaml\.load\s*\(|\bpickle\.load\b|\bunserialize\s*\(/,
+  },
 ];
 
 /** 单次最多提示的条数：再多就该在别处解决，塞满上下文反而没人看 */
@@ -150,23 +174,48 @@ function statePath(sessionId: string): string {
   return join(dir, `${sessionId.replace(/[^A-Za-z0-9_.-]/g, "_")}.json`);
 }
 
-/** 已提示过的 rule@文件 指纹；读写失败都不影响提示本身 */
-function loadShown(sessionId: string): Set<string> {
+/**
+ * 提示状态。
+ * shown: 已提示过的 rule@文件 指纹，同一处只提示一次。
+ * hits:  每条规则的累计命中次数——误报调优的依据：某规则长期高命中却没人改，
+ *        说明规则写得不对，该收紧或删掉。
+ */
+interface RuleStats {
+  shown: string[];
+  hits: Record<string, number>;
+}
+
+function loadStats(sessionId: string): RuleStats {
   try {
     const raw = readFileSync(statePath(sessionId), "utf8");
     const parsed: unknown = JSON.parse(raw);
-    if (Array.isArray(parsed)) return new Set(parsed.filter((v): v is string => typeof v === "string"));
+    if (Array.isArray(parsed)) {
+      // 旧格式只有 shown 数组，兼容读取
+      return { shown: parsed.filter((v): v is string => typeof v === "string"), hits: {} };
+    }
+    if (parsed && typeof parsed === "object") {
+      const obj = parsed as Record<string, unknown>;
+      return {
+        shown: Array.isArray(obj["shown"])
+          ? obj["shown"].filter((v): v is string => typeof v === "string")
+          : [],
+        hits:
+          obj["hits"] && typeof obj["hits"] === "object"
+            ? (obj["hits"] as Record<string, number>)
+            : {},
+      };
+    }
   } catch {
-    // 首次运行或文件损坏：当作空集合，重新提示一遍是安全的
+    // 首次运行或文件损坏：当作空状态，重新提示一遍是安全的
   }
-  return new Set();
+  return { shown: [], hits: {} };
 }
 
-function saveShown(sessionId: string, shown: Set<string>): void {
+function saveStats(sessionId: string, stats: RuleStats): void {
   try {
     const p = statePath(sessionId);
     mkdirSync(join(p, ".."), { recursive: true });
-    writeFileSync(p, JSON.stringify([...shown]), "utf8");
+    writeFileSync(p, JSON.stringify(stats), "utf8");
   } catch {
     // 落盘失败只意味着下次可能重复提示，不影响本次结果
   }
@@ -199,20 +248,27 @@ async function main(): Promise<void> {
 
   const file = typeof toolInput["file_path"] === "string" ? (toolInput["file_path"] as string) : "(未知文件)";
   const sessionId = input.session_id ?? "default";
-  const shown = loadShown(sessionId);
+  const stats = loadStats(sessionId);
+  const shown = new Set(stats.shown);
 
   const hits: Array<{ rule: Rule; digest: string }> = [];
   for (const rule of RULES) {
     if (!rule.pattern.test(text)) continue;
+    // 命中即计数，不论是否已提示过——误报调优要的是全量命中
+    stats.hits[rule.id] = (stats.hits[rule.id] ?? 0) + 1;
     const digest = `${rule.id}@${file}`;
     if (shown.has(digest)) continue;
     hits.push({ rule, digest });
     if (hits.length >= MAX_WARNINGS) break;
   }
-  if (hits.length === 0) return;
+  if (hits.length === 0) {
+    saveStats(sessionId, stats);
+    return;
+  }
 
   for (const h of hits) shown.add(h.digest);
-  saveShown(sessionId, shown);
+  stats.shown = [...shown];
+  saveStats(sessionId, stats);
 
   const lines = [
     `[security-review] 本次改动命中 ${hits.length} 条安全规则，请判断是否成立并处理：`,

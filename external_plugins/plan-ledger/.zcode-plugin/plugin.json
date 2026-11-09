@@ -1,6 +1,6 @@
 {
   "name": "plan-ledger",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Progress ledger and three-way consistency checks across /goal, plan files and todos.",
   "description_i18n": {
     "en": "Progress ledger and three-way consistency checks across /goal, plan files and todos.",

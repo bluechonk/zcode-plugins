@@ -45,5 +45,25 @@ export function checkConsistency(input: ConsistencyInput): string[] {
     out.push(`⚠️ 有计划（${phases.length} 个阶段）但没有任何待办：计划未落到可执行粒度。`);
   }
 
+  // 计划阶段很多但待办极少：两边粒度对不上，要么待办没拆细，要么计划过度拆分
+  if (phases.length >= 5 && todos.length <= 1) {
+    out.push(
+      `⚠️ 计划有 ${phases.length} 个阶段，待办却只有 ${todos.length} 项：粒度不匹配，把待办拆到与阶段对应的粒度。`
+    );
+  }
+
+  // 目标 active 但待办长时间没动：目标在推进而执行层停摆。
+  // 阈值取 2 小时——一轮对话通常几分钟，25 轮量级约 2 小时。
+  const STALE_TODO_MS = 2 * 60 * 60 * 1000;
+  if (goal?.status === "active" && todos.length > 0) {
+    const newest = Math.max(...todos.map((t) => t.timeUpdated));
+    if (newest > 0 && Date.now() - newest > STALE_TODO_MS) {
+      const hours = Math.round((Date.now() - newest) / 3_600_000);
+      out.push(
+        `⚠️ 目标仍 active，但待办已 ${hours} 小时未更新：确认是漏了更新，还是任务已实际完成该执行 \`/goal clear\`。`
+      );
+    }
+  }
+
   return out;
 }

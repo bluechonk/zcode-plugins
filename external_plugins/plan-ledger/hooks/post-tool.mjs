@@ -2,6 +2,9 @@
 // 请修改源码并重跑 `npm run build`，不要直接编辑本文件。
 
 
+// external_plugins/plan-ledger/src/post-tool.ts
+import { join as join4 } from "node:path";
+
 // external_plugins/plan-ledger/src/lib/hook.ts
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
@@ -81,12 +84,29 @@ function checkConsistency(input) {
   if (planPath && !hasTodo && phases.length > 0) {
     out.push(`\u26A0\uFE0F \u6709\u8BA1\u5212\uFF08${phases.length} \u4E2A\u9636\u6BB5\uFF09\u4F46\u6CA1\u6709\u4EFB\u4F55\u5F85\u529E\uFF1A\u8BA1\u5212\u672A\u843D\u5230\u53EF\u6267\u884C\u7C92\u5EA6\u3002`);
   }
+  if (phases.length >= 5 && todos.length <= 1) {
+    out.push(
+      `\u26A0\uFE0F \u8BA1\u5212\u6709 ${phases.length} \u4E2A\u9636\u6BB5\uFF0C\u5F85\u529E\u5374\u53EA\u6709 ${todos.length} \u9879\uFF1A\u7C92\u5EA6\u4E0D\u5339\u914D\uFF0C\u628A\u5F85\u529E\u62C6\u5230\u4E0E\u9636\u6BB5\u5BF9\u5E94\u7684\u7C92\u5EA6\u3002`
+    );
+  }
+  const STALE_TODO_MS = 2 * 60 * 60 * 1e3;
+  if (goal?.status === "active" && todos.length > 0) {
+    const newest = Math.max(...todos.map((t) => t.timeUpdated));
+    if (newest > 0 && Date.now() - newest > STALE_TODO_MS) {
+      const hours = Math.round((Date.now() - newest) / 36e5);
+      out.push(
+        `\u26A0\uFE0F \u76EE\u6807\u4ECD active\uFF0C\u4F46\u5F85\u529E\u5DF2 ${hours} \u5C0F\u65F6\u672A\u66F4\u65B0\uFF1A\u786E\u8BA4\u662F\u6F0F\u4E86\u66F4\u65B0\uFF0C\u8FD8\u662F\u4EFB\u52A1\u5DF2\u5B9E\u9645\u5B8C\u6210\u8BE5\u6267\u884C \`/goal clear\`\u3002`
+      );
+    }
+  }
   return out;
 }
 
 // external_plugins/plan-ledger/src/lib/ledger.ts
-import { mkdirSync as mkdirSync2, writeFileSync as writeFileSync2 } from "node:fs";
+import { mkdirSync as mkdirSync2, readdirSync, rmSync, statSync, writeFileSync as writeFileSync2 } from "node:fs";
 import { join as join2 } from "node:path";
+var MAX_ACTIVITY_LINES = 15;
+var MAX_LEDGERS = 200;
 var STATUS_MARK = {
   completed: "x",
   in_progress: ">",
@@ -138,7 +158,7 @@ function renderLedger(input) {
   }
   if (input.events.length > 0) {
     lines.push("## \u6D3B\u52A8\u7EBF", "", "| \u65F6\u95F4 | \u4E8B\u4EF6 | \u53D8\u5316 |", "| --- | --- | --- |");
-    for (const e of input.events.slice(-15)) {
+    for (const e of input.events.slice(-MAX_ACTIVITY_LINES)) {
       lines.push(`| ${e.at} | ${e.event} | ${e.detail} |`);
     }
     lines.push("");
@@ -157,10 +177,20 @@ function writeLedger(path, content) {
   } catch {
   }
 }
+function pruneLedgers(plansDir, max = MAX_LEDGERS) {
+  try {
+    const stale = readdirSync(plansDir).filter((f) => /^progress-.+\.md$/u.test(f)).map((f) => {
+      const p = join2(plansDir, f);
+      return { p, mtime: statSync(p).mtimeMs };
+    }).sort((a, b) => b.mtime - a.mtime).slice(max);
+    for (const { p } of stale) rmSync(p, { force: true });
+  } catch {
+  }
+}
 
 // external_plugins/plan-ledger/src/lib/zcode-db.ts
 import { DatabaseSync } from "node:sqlite";
-import { existsSync, readFileSync as readFileSync2, readdirSync } from "node:fs";
+import { existsSync, readFileSync as readFileSync3, readdirSync as readdirSync2 } from "node:fs";
 import { homedir as homedir2 } from "node:os";
 import { join as join3 } from "node:path";
 var DB_PATH = join3(homedir2(), ".zcode", "cli", "db", "db.sqlite");
@@ -179,14 +209,15 @@ function withDb(fn, fallback) {
 function readTodos(sessionId) {
   return withDb((db) => {
     const rows = db.prepare(
-      `SELECT content, status, priority, position FROM todo
+      `SELECT content, status, priority, position, time_updated FROM todo
          WHERE session_id = ? ORDER BY position ASC`
     ).all(sessionId);
     return rows.map((r) => ({
       content: String(r["content"] ?? ""),
       status: String(r["status"] ?? "pending"),
       priority: String(r["priority"] ?? "medium"),
-      position: Number(r["position"] ?? 0)
+      position: Number(r["position"] ?? 0),
+      timeUpdated: Number(r["time_updated"] ?? 0)
     }));
   }, []);
 }
@@ -236,7 +267,7 @@ function readPlan(cwd, sessionId) {
   const path = findPlanFile(cwd, sessionId);
   if (!path) return null;
   try {
-    const text = readFileSync2(path, "utf8");
+    const text = readFileSync3(path, "utf8");
     return { path, text, phases: extractPhases(text) };
   } catch {
     return null;
@@ -278,6 +309,8 @@ async function main() {
     events,
     consistency
   });
-  writeLedger(ledgerPath(cwd, sessionId, plan?.path ?? null), content);
+  const ledger = ledgerPath(cwd, sessionId, plan?.path ?? null);
+  writeLedger(ledger, content);
+  pruneLedgers(join4(ledger, ".."));
 }
 main().then(() => process.exit(0)).catch(() => process.exit(0));

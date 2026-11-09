@@ -22,6 +22,8 @@ export interface TodoItem {
   status: string;
   priority: string;
   position: number;
+  /** 最近一次更新时间（Unix 毫秒）；用于判断待办是否长期无进展 */
+  timeUpdated: number;
 }
 
 export interface GoalInfo {
@@ -50,7 +52,7 @@ export function readTodos(sessionId: string): TodoItem[] {
   return withDb((db) => {
     const rows = db
       .prepare(
-        `SELECT content, status, priority, position FROM todo
+        `SELECT content, status, priority, position, time_updated FROM todo
          WHERE session_id = ? ORDER BY position ASC`
       )
       .all(sessionId) as Array<Record<string, unknown>>;
@@ -59,6 +61,7 @@ export function readTodos(sessionId: string): TodoItem[] {
       status: String(r["status"] ?? "pending"),
       priority: String(r["priority"] ?? "medium"),
       position: Number(r["position"] ?? 0),
+      timeUpdated: Number(r["time_updated"] ?? 0),
     }));
   }, []);
 }

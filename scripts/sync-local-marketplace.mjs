@@ -219,10 +219,10 @@ if (!MARKETPLACE_ONLY) {
 
     // 安装记录只读不写：ZCode 会话启动时自己刷新，越权写会与它打架
     if (!record) {
-      console.log(`    ⚠ installed_plugins.json 里没有 ${name}@${mktName}，ZCode 里可能未安装`);
+      console.log(`    注意：installed_plugins.json 里没有 ${name}@${mktName}，ZCode 里可能未安装`);
     } else if (record.version !== version) {
       console.log(
-        `    ⚠ 安装记录仍是 ${record.version}，缓存已是 ${version}。` +
+        `    注意：安装记录仍是 ${record.version}，缓存已是 ${version}。` +
           `重开一个会话让 ZCode 刷新，或在 ZCode 里更新该插件。`
       );
     }

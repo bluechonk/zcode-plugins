@@ -26,29 +26,29 @@ export function checkConsistency(input: ConsistencyInput): string[] {
   // 目标还没结，但待办全清空了 —— 要么漏了，要么该 /goal clear
   if (goal?.status === "active" && hasTodo && open === 0) {
     out.push(
-      `⚠️ 目标仍 active，但 ${todos.length} 项待办已全部完成：确认是收尾该执行 \`/goal clear\`，还是漏了收尾步骤。`
+      `目标仍 active，但 ${todos.length} 项待办已全部完成：确认是收尾该执行 \`/goal clear\`，还是漏了收尾步骤。`
     );
   }
 
   // 目标已判完成，待办还有没做的
   if (goal?.status === "complete" && open > 0) {
-    out.push(`⚠️ 目标已标记 complete，但仍有 ${open} 项待办未完成：核对是待办过期，还是目标判早了。`);
+    out.push(`目标已标记 complete，但仍有 ${open} 项待办未完成：核对是待办过期，还是目标判早了。`);
   }
 
   // 有目标但没有待办 —— 执行层完全空着
   if (goal?.status === "active" && !hasTodo) {
-    out.push("⚠️ 目标 active 但没有任何待办：建议用 TodoWrite 把目标拆成可勾选的步骤。");
+    out.push("目标 active 但没有任何待办：建议用 TodoWrite 把目标拆成可勾选的步骤。");
   }
 
   // 有计划文件但从未拆待办
   if (planPath && !hasTodo && phases.length > 0) {
-    out.push(`⚠️ 有计划（${phases.length} 个阶段）但没有任何待办：计划未落到可执行粒度。`);
+    out.push(`有计划（${phases.length} 个阶段）但没有任何待办：计划未落到可执行粒度。`);
   }
 
   // 计划阶段很多但待办极少：两边粒度对不上，要么待办没拆细，要么计划过度拆分
   if (phases.length >= 5 && todos.length <= 1) {
     out.push(
-      `⚠️ 计划有 ${phases.length} 个阶段，待办却只有 ${todos.length} 项：粒度不匹配，把待办拆到与阶段对应的粒度。`
+      `计划有 ${phases.length} 个阶段，待办却只有 ${todos.length} 项：粒度不匹配，把待办拆到与阶段对应的粒度。`
     );
   }
 
@@ -60,7 +60,7 @@ export function checkConsistency(input: ConsistencyInput): string[] {
     if (newest > 0 && Date.now() - newest > STALE_TODO_MS) {
       const hours = Math.round((Date.now() - newest) / 3_600_000);
       out.push(
-        `⚠️ 目标仍 active，但待办已 ${hours} 小时未更新：确认是漏了更新，还是任务已实际完成该执行 \`/goal clear\`。`
+        `目标仍 active，但待办已 ${hours} 小时未更新：确认是漏了更新，还是任务已实际完成该执行 \`/goal clear\`。`
       );
     }
   }

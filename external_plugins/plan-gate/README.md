@@ -4,19 +4,29 @@
 
 ZCode 内置的 TodoWrite 提醒只是劝，模型可以忽略；本插件在工具执行前检查，没有规划就直接拒绝。
 
-## 当前模式：observe（观察态）
+## 当前模式：enforce
 
-`hooks/plan-gate.mjs` 顶部的 `MODE` 为 `observe`：**只写日志，从不拦截**。
+`hooks/plan-gate.mjs` 顶部的 `MODE` 为 `enforce`：按规则拦截。
 
-这样做的原因是官方文档对「第三方市场的插件 hook 是否执行」有两种矛盾说法，需要先实测确认再切强制。观察态每次触发都会追加一行到：
+判定结果仍会追加到 `~/.zcode/plan-gate.log`（含 `deny` / `nudge` / `skip:*`），便于事后核对门禁为什么放行或拦截某次调用。
+
+`observe` 模式（只记日志、从不拦截）保留在代码里，排障时可临时切回。
+
+### 为什么先跑过 observe
+
+官方 `zai-org/zcode-plugins` 的 AGENTS.md 称 hook 仅在官方市场或本地目录安装时执行，而 ZCode 的 `diagnosing-hooks` 文档称该说法已过期。两种说法矛盾，直接上 enforce 存在门禁静默失效的风险。
+
+实测结论：**第三方市场的插件 hook 确实执行**。观察日志与 ZCode 日志两侧都留下记录：
 
 ```
-~/.zcode/plan-gate.log
+# ~/.zcode/plan-gate.log
+2026-11-09T00:42:27.001Z observe {"skip":"allowlisted-or-unknown","tool":"Bash","sessionId":"sess_863118a5-…"}
+
+# ~/.zcode/cli/log/zcode-2026-11-09.jsonl
+00:42:27.012Z  hook.run.allowed  plugin:plugin.plan-gate@bluechonk-plugins.PreToolUse  Bash
 ```
 
-日志行含时间、模式、工具名、会话 id 与判定结果（`deny` / `nudge` / `skip:*`）。**看到日志就证明插件 hook 确实被执行了。**
-
-确认后把 `MODE` 改成 `"enforce"` 并升版本，门禁即生效。
+注意 **hook 在会话创建时注册**：装完插件必须开新会话，当前已打开的会话不会捡到它。
 
 ## 判定规则
 

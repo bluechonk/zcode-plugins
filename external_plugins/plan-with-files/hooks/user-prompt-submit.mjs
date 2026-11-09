@@ -116,15 +116,6 @@ var TEMPLATE = [
   "",
   "\u5F85\u529E\u4F1A\u5199\u8FDB .zcode/plans/progress-<sessionId>.md\uFF0C\u968F\u65F6\u53EF\u67E5\u5F53\u524D\u8FDB\u5EA6\u3002"
 ].join("\n");
-var CONFLICT_NOTICE = [
-  "[plan-with-files] \u68C0\u6D4B\u5230\u539F\u751F plan \u6A21\u5F0F\u5DF2\u5F00\u542F\uFF0C\u4E0E\u672C\u63D2\u4EF6\u51B2\u7A81\uFF1A",
-  "",
-  "- \u539F\u751F plan \u4F1A\u6CE8\u5165 5 Phase \u63D0\u793A\u8BCD\uFF0C\u4E0E\u672C\u63D2\u4EF6\u7684\u89C4\u5212\u6A21\u677F\u540C\u65F6\u751F\u6548",
-  "- \u5B83\u7684\u8BA1\u5212\u5199\u8FDB .zcode/plans/ \u4E14\u6C38\u4E45\u7D2F\u79EF\uFF0C\u6CA1\u6709\u6E05\u7406\u673A\u5236",
-  "- \u63D0\u4EA4\u8BA1\u5212\u8981\u5BA1\u6279\uFF0C\u6253\u65AD\u6D41\u7A0B",
-  "",
-  "\u5EFA\u8BAE\u5207\u5230 build \u6A21\u5F0F\uFF0C\u7528 TodoWrite \u62C6\u89E3\u4EFB\u52A1\u3002\u672C\u63D2\u4EF6\u7684\u53F0\u8D26\u4F1A\u63A5\u7BA1\u8FDB\u5EA6\u8FFD\u8E2A\u3002"
-].join("\n");
 async function main() {
   if (disabled()) return;
   const input = await readHookInput();
@@ -132,11 +123,6 @@ async function main() {
   if (isSubagent(input)) return;
   const sessionId = input.session_id ?? "";
   if (!sessionId) return;
-  const mode = input.mode ?? input.permission_mode ?? "";
-  if (mode === "plan") {
-    emit("UserPromptSubmit", { additionalContext: CONFLICT_NOTICE });
-    return;
-  }
   const prompt = typeof input.prompt === "string" ? input.prompt : "";
   if (!looksMultiStep(prompt)) return;
   if (hasTodoThisTurn(sessionId)) return;

@@ -80,14 +80,15 @@ function withDb(fn, fallback) {
 function readTodos(sessionId) {
   return withDb((db) => {
     const rows = db.prepare(
-      `SELECT content, status, priority, position FROM todo
+      `SELECT content, status, priority, position, time_updated FROM todo
          WHERE session_id = ? ORDER BY position ASC`
     ).all(sessionId);
     return rows.map((r) => ({
       content: String(r["content"] ?? ""),
       status: String(r["status"] ?? "pending"),
       priority: String(r["priority"] ?? "medium"),
-      position: Number(r["position"] ?? 0)
+      position: Number(r["position"] ?? 0),
+      timeUpdated: Number(r["time_updated"] ?? 0)
     }));
   }, []);
 }

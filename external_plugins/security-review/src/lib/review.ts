@@ -64,6 +64,7 @@ export function resolveModel(sessionId: string): string | null {
 const SYSTEM_PROMPT = [
   "你是安全审查员，只做只读分析。",
   "只报你在这段 diff 里能确证的真实漏洞，不要报风格问题、不要报占位符/示例/测试夹具。",
+  "只审本轮新引入的改动：新增与修改的行。删除的行、以及 diff 里未改动的上下文行都不在本轮范围。",
   "拿不准就不要报——误报会让开发者付出比漏报更高的代价。",
   "",
   "只输出 JSON，不要任何解释文字：",

@@ -58,6 +58,21 @@ function checkConsistency(input) {
   if (planPath && !hasTodo && phases.length > 0) {
     out.push(`\u26A0\uFE0F \u6709\u8BA1\u5212\uFF08${phases.length} \u4E2A\u9636\u6BB5\uFF09\u4F46\u6CA1\u6709\u4EFB\u4F55\u5F85\u529E\uFF1A\u8BA1\u5212\u672A\u843D\u5230\u53EF\u6267\u884C\u7C92\u5EA6\u3002`);
   }
+  if (phases.length >= 5 && todos.length <= 1) {
+    out.push(
+      `\u26A0\uFE0F \u8BA1\u5212\u6709 ${phases.length} \u4E2A\u9636\u6BB5\uFF0C\u5F85\u529E\u5374\u53EA\u6709 ${todos.length} \u9879\uFF1A\u7C92\u5EA6\u4E0D\u5339\u914D\uFF0C\u628A\u5F85\u529E\u62C6\u5230\u4E0E\u9636\u6BB5\u5BF9\u5E94\u7684\u7C92\u5EA6\u3002`
+    );
+  }
+  const STALE_TODO_MS = 2 * 60 * 60 * 1e3;
+  if (goal?.status === "active" && todos.length > 0) {
+    const newest = Math.max(...todos.map((t) => t.timeUpdated));
+    if (newest > 0 && Date.now() - newest > STALE_TODO_MS) {
+      const hours = Math.round((Date.now() - newest) / 36e5);
+      out.push(
+        `\u26A0\uFE0F \u76EE\u6807\u4ECD active\uFF0C\u4F46\u5F85\u529E\u5DF2 ${hours} \u5C0F\u65F6\u672A\u66F4\u65B0\uFF1A\u786E\u8BA4\u662F\u6F0F\u4E86\u66F4\u65B0\uFF0C\u8FD8\u662F\u4EFB\u52A1\u5DF2\u5B9E\u9645\u5B8C\u6210\u8BE5\u6267\u884C \`/goal clear\`\u3002`
+      );
+    }
+  }
   return out;
 }
 
@@ -82,14 +97,15 @@ function withDb(fn, fallback) {
 function readTodos(sessionId) {
   return withDb((db) => {
     const rows = db.prepare(
-      `SELECT content, status, priority, position FROM todo
+      `SELECT content, status, priority, position, time_updated FROM todo
          WHERE session_id = ? ORDER BY position ASC`
     ).all(sessionId);
     return rows.map((r) => ({
       content: String(r["content"] ?? ""),
       status: String(r["status"] ?? "pending"),
       priority: String(r["priority"] ?? "medium"),
-      position: Number(r["position"] ?? 0)
+      position: Number(r["position"] ?? 0),
+      timeUpdated: Number(r["time_updated"] ?? 0)
     }));
   }, []);
 }

@@ -2,7 +2,8 @@
 // 零依赖：只用 Node 内置的 fetch。
 
 export const DEFAULT_BASE_URL = "https://api.deepseek.com";
-export const DEFAULT_VERSION = "0.1.3";
+// 插件版本，与 .zcode-plugin/plugin.json 保持一致
+export const DEFAULT_VERSION = "0.1.1";
 
 export class ApiError extends Error {
   constructor(message, { status, code, type, body } = {}) {
@@ -44,8 +45,27 @@ export function resolveConfig(overrides = {}) {
   return { apiKey, baseUrl };
 }
 
+// 重试策略：5xx 与网络错误重试 2 次，退避 100ms / 200ms。
+// 4xx 不重试——密钥错、参数错重试多少次都是同样结果，只是白等。
+const MAX_RETRIES = 2;
+const RETRY_BASE_MS = 100;
+
+// 搜索缓存：只缓存 search，TTL 5 分钟。
+// 内存缓存而非磁盘：CLI 每次调用都是新进程，磁盘缓存命中率低且要处理残留；
+// MCP 是长驻进程，能真正吃到缓存。
+const CACHE_TTL_MS = 5 * 60 * 1000;
+const searchCache = new Map();
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function backoffDelay(attempt) {
+  return RETRY_BASE_MS * attempt;
+}
+
 // 统一请求：只读接口，失败抛出带状态码的 ApiError。
-export async function requestJson(path, { apiKey, baseUrl }, payload) {
+export async function requestJson(path, { apiKey, baseUrl }, payload, { retries = MAX_RETRIES } = {}) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 30_000);
 
@@ -62,7 +82,15 @@ export async function requestJson(path, { apiKey, baseUrl }, payload) {
     });
   } catch (error) {
     if (error.name === "AbortError") {
+      if (retries > 0) {
+        await sleep(backoffDelay(MAX_RETRIES - retries + 1));
+        return requestJson(path, { apiKey, baseUrl }, payload, { retries: retries - 1 });
+      }
       throw new ApiError("Request timed out after 30s.", { status: 408, code: "timeout" });
+    }
+    if (retries > 0) {
+      await sleep(backoffDelay(MAX_RETRIES - retries + 1));
+      return requestJson(path, { apiKey, baseUrl }, payload, { retries: retries - 1 });
     }
     throw new ApiError(`Network error: ${error.message}`, { status: 504, code: "network_error" });
   } finally {
@@ -80,6 +108,10 @@ export async function requestJson(path, { apiKey, baseUrl }, payload) {
   }
 
   if (!response.ok) {
+    if (response.status >= 500 && retries > 0) {
+      await sleep(backoffDelay(MAX_RETRIES - retries + 1));
+      return requestJson(path, { apiKey, baseUrl }, payload, { retries: retries - 1 });
+    }
     const error = data && typeof data === "object" ? data.error : null;
     const message =
       (error && (error.message || error.code)) ||
@@ -104,7 +136,17 @@ export function search(params, config) {
   if (params.oriQuestion) body.ori_question = params.oriQuestion;
   if (params.localization) body.localization = params.localization;
   if (params.needContent) body.need_content = true;
-  return requestJson("/v1/tools/search", config, body);
+
+  // 相同查询在 TTL 内直接复用，省额度
+  const key = JSON.stringify(body);
+  const cached = searchCache.get(key);
+  if (cached && Date.now() - cached.at < CACHE_TTL_MS) {
+    return Promise.resolve(cached.data);
+  }
+  return requestJson("/v1/tools/search", config, body).then((data) => {
+    searchCache.set(key, { at: Date.now(), data });
+    return data;
+  });
 }
 
 // Fetch：把目标网页抓成 Markdown。

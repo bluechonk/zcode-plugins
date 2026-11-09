@@ -8,7 +8,7 @@
     "build": "node scripts/build.mjs",
     "typecheck": "tsc --noEmit",
     "sync:local": "node scripts/sync-local-marketplace.mjs",
-    "check": "npm run typecheck && node scripts/build.mjs --check && python3 scripts/validate.py"
+    "check": "npm run typecheck && node scripts/build.mjs --check && node scripts/validate.mjs"
   },
   "engines": {
     "node": ">=22"

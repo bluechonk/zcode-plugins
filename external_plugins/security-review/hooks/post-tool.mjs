@@ -80,6 +80,30 @@ var RULES = [
     what: "CORS \u5141\u8BB8\u4EFB\u610F\u6765\u6E90",
     fix: "\u6539\u4E3A\u767D\u540D\u5355\u6765\u6E90\uFF0C\u6216\u660E\u786E\u8BF4\u660E\u4E3A\u4F55\u9700\u8981\u653E\u5F00",
     pattern: /(Access-Control-Allow-Origin["'`]?\s*[:,]\s*["'`]\*|origin\s*:\s*["'`]\*["'`])/i
+  },
+  {
+    id: "jwt-weak-secret",
+    what: "\u7591\u4F3C\u628A JWT \u5BC6\u94A5\u5199\u6210\u5B57\u9762\u91CF",
+    fix: "\u5BC6\u94A5\u4ECE\u73AF\u5883\u53D8\u91CF\u8BFB\u53D6\uFF0C\u81F3\u5C11 32 \u5B57\u8282\uFF0C\u4E0D\u8981\u7528\u793A\u4F8B\u503C",
+    pattern: /\b(jwt[_-]?secret|jwt[_-]?key|JWT_SECRET|JWT_KEY)\b\s*[:=]\s*["'`][A-Za-z0-9_\-.]{8,}["'`]/i
+  },
+  {
+    id: "hardcoded-iv-salt",
+    what: "\u7591\u4F3C\u786C\u7F16\u7801 IV \u6216\u76D0",
+    fix: "IV \u6BCF\u6B21\u968F\u673A\u751F\u6210\u5E76\u968F\u5BC6\u6587\u5B58\u50A8\uFF1B\u76D0\u7528 crypto.randomBytes \u751F\u6210",
+    pattern: /\b(iv|salt|nonce)\b\s*[:=]\s*["'`][A-Za-z0-9+/=]{8,}["'`]/i
+  },
+  {
+    id: "child-process-concat",
+    what: "child_process \u7528\u5B57\u7B26\u4E32\u62FC\u63A5\u6784\u9020\u547D\u4EE4",
+    fix: "\u6539\u7528 execFile / spawn \u7684\u6570\u7EC4\u53C2\u6570\uFF0C\u907F\u514D shell \u6CE8\u5165",
+    pattern: /\bexec\s*\(\s*[`"][^`"]*(?:\$\{|\+|"+)/
+  },
+  {
+    id: "unsafe-deserialize",
+    what: "\u4E0D\u5B89\u5168\u7684\u53CD\u5E8F\u5217\u5316",
+    fix: "\u6539\u7528 JSON \u6216\u5E26 schema \u6821\u9A8C\u7684\u89E3\u6790\uFF1Byaml \u7528 SafeLoader",
+    pattern: /\byaml\.load\s*\(|\bpickle\.load\b|\bunserialize\s*\(/
   }
 ];
 var MAX_WARNINGS = 5;
@@ -110,20 +134,29 @@ function statePath(sessionId) {
   const dir = process.env["ZCODE_PLUGIN_DATA"] ?? process.env["CLAUDE_PLUGIN_DATA"] ?? join(homedir(), ".zcode", "security-review");
   return join(dir, `${sessionId.replace(/[^A-Za-z0-9_.-]/g, "_")}.json`);
 }
-function loadShown(sessionId) {
+function loadStats(sessionId) {
   try {
     const raw = readFileSync(statePath(sessionId), "utf8");
     const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed)) return new Set(parsed.filter((v) => typeof v === "string"));
+    if (Array.isArray(parsed)) {
+      return { shown: parsed.filter((v) => typeof v === "string"), hits: {} };
+    }
+    if (parsed && typeof parsed === "object") {
+      const obj = parsed;
+      return {
+        shown: Array.isArray(obj["shown"]) ? obj["shown"].filter((v) => typeof v === "string") : [],
+        hits: obj["hits"] && typeof obj["hits"] === "object" ? obj["hits"] : {}
+      };
+    }
   } catch {
   }
-  return /* @__PURE__ */ new Set();
+  return { shown: [], hits: {} };
 }
-function saveShown(sessionId, shown) {
+function saveStats(sessionId, stats) {
   try {
     const p = statePath(sessionId);
     mkdirSync(join(p, ".."), { recursive: true });
-    writeFileSync(p, JSON.stringify([...shown]), "utf8");
+    writeFileSync(p, JSON.stringify(stats), "utf8");
   } catch {
   }
 }
@@ -149,18 +182,24 @@ async function main() {
   if (!text || text.length > MAX_SCAN_BYTES) return;
   const file = typeof toolInput["file_path"] === "string" ? toolInput["file_path"] : "(\u672A\u77E5\u6587\u4EF6)";
   const sessionId = input.session_id ?? "default";
-  const shown = loadShown(sessionId);
+  const stats = loadStats(sessionId);
+  const shown = new Set(stats.shown);
   const hits = [];
   for (const rule of RULES) {
     if (!rule.pattern.test(text)) continue;
+    stats.hits[rule.id] = (stats.hits[rule.id] ?? 0) + 1;
     const digest = `${rule.id}@${file}`;
     if (shown.has(digest)) continue;
     hits.push({ rule, digest });
     if (hits.length >= MAX_WARNINGS) break;
   }
-  if (hits.length === 0) return;
+  if (hits.length === 0) {
+    saveStats(sessionId, stats);
+    return;
+  }
   for (const h of hits) shown.add(h.digest);
-  saveShown(sessionId, shown);
+  stats.shown = [...shown];
+  saveStats(sessionId, stats);
   const lines = [
     `[security-review] \u672C\u6B21\u6539\u52A8\u547D\u4E2D ${hits.length} \u6761\u5B89\u5168\u89C4\u5219\uFF0C\u8BF7\u5224\u65AD\u662F\u5426\u6210\u7ACB\u5E76\u5904\u7406\uFF1A`,
     ""

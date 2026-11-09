@@ -5,9 +5,11 @@
  * 而且 TodoRead 与 TodoWrite 走同一条读取路径，行为一致。
  */
 
+import { join } from "node:path";
+
 import { disabled, isSubagent, readHookInput, readState, writeState } from "./lib/hook";
 import { checkConsistency } from "./lib/consistency";
-import { ledgerPath, renderLedger, writeLedger, type LedgerEvent } from "./lib/ledger";
+import { ledgerPath, pruneLedgers, renderLedger, writeLedger, type LedgerEvent } from "./lib/ledger";
 import { readGoal, readPlan, readTodos } from "./lib/zcode-db";
 
 function stamp(): string {
@@ -58,7 +60,9 @@ async function main(): Promise<void> {
     events,
     consistency,
   });
-  writeLedger(ledgerPath(cwd, sessionId, plan?.path ?? null), content);
+  const ledger = ledgerPath(cwd, sessionId, plan?.path ?? null);
+  writeLedger(ledger, content);
+  pruneLedgers(join(ledger, ".."));
 }
 
 main()

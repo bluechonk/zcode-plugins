@@ -12,14 +12,46 @@ ZCode 自带三层机制，但彼此互不知情：
 
 本插件不重做任何一层，只补它们之间的空隙。
 
-## 四个 hook
+## 五个 hook
 
 | 事件 | 做什么 |
 | --- | --- |
-| `PreToolUse` | 仅 `ExitPlanMode` 提交计划时记下阶段标题；标题太通用时提示 |
+| `PreToolUse` | 拦 `EnterPlanMode`；`ExitPlanMode` 提交计划时记下阶段标题并检查标题 |
 | `PostToolUse` | `TodoWrite` / `TodoRead` 之后重建台账 |
+| `UserPromptSubmit` | 多步任务时注入规划模板（每会话最多 3 次） |
 | `SessionStart` | 注入三方状态摘要，带节流 |
 | `Stop` | 三方一致性核对，**只提醒不阻塞** |
+
+### 为什么接管 plan 模式
+
+ZCode 内置 plan 模式有两个问题：
+
+**一、产出的是流程文档，不是可执行状态。** 它的 5 Phase（理解 / 设计 / 评审 / 定稿 / 提交）是「你要做什么」的流程引导，计划正文仍是自由 Markdown，没有状态标记，脚本读不出完成度。
+
+**二、每次都要审批。** `ExitPlanMode` 的工具声明里 `requiresUserInteraction: true`，提交计划必然弹审批，无法跳过。
+
+本插件改为拦下 `EnterPlanMode`，让模型直接用 `TodoWrite`：
+
+```
+todo 表 = 状态机
+  status: pending / in_progress / completed
+  position: 依赖顺序
+```
+
+`TodoWrite` 不需要审批，状态可被脚本读取，且已有 `progress-<sessionId>.md` 台账汇总进度。
+
+确需原生 plan 模式时，设 `PLAN_LEDGER_ALLOW_PLAN_MODE=1` 放行。
+
+### 规划模板
+
+`UserPromptSubmit` 检测到多步任务（提问超过 80 字或含「实现 / 重构 / 迁移 / 排查」等词）且本轮还没有 `TodoWrite` 时，注入一份轻量模板，强调：
+
+- 每项写清「做什么 + 怎么算完成」
+- 按依赖顺序排 position
+- 一次只留一个 `in_progress`
+- 完成后立刻标 `completed`
+
+每个会话最多注入 3 次，避免变成噪音。
 
 ### 计划标题要带主题
 
@@ -115,6 +147,7 @@ ZCode 侧边栏的「计划」面板用**每份计划的第一个标题**作为�
 | 变量 | 默认 | 说明 |
 | --- | --- | --- |
 | `PLAN_LEDGER_DISABLE` | — | 设 `1` 整体关闭 |
+| `PLAN_LEDGER_ALLOW_PLAN_MODE` | — | 设 `1` 放行 `EnterPlanMode`，恢复 ZCode 原生 plan 模式 |
 | `ZCODE_PLAN_GATE` | — | 设 `off` 整体关闭（插件改名前的兼容开关） |
 
 ## 数据来源

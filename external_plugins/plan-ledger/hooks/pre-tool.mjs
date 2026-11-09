@@ -85,6 +85,10 @@ function genericTitleOf(plan) {
   }
   return null;
 }
+function blocksPlanMode() {
+  return process.env["PLAN_LEDGER_ALLOW_PLAN_MODE"] !== "1";
+}
+var DENY_PLAN_MODE = "[plan-ledger] \u4E0D\u7528 ZCode \u5185\u7F6E plan \u6A21\u5F0F\uFF1A\u5B83\u4EA7\u51FA\u7684\u662F\u6D41\u7A0B\u6587\u6863\u800C\u975E\u53EF\u6267\u884C\u72B6\u6001\uFF0C\u4E14\u6BCF\u6B21\u90FD\u8981\u5BA1\u6279\u3002\u8BF7\u76F4\u63A5\u7528 TodoWrite \u62C6\u89E3\u4EFB\u52A1\u2014\u2014\u6BCF\u9879\u5199\u6E05\u300C\u505A\u4EC0\u4E48 + \u600E\u4E48\u7B97\u5B8C\u6210\u300D\uFF0C\u6309\u4F9D\u8D56\u6392\u5E8F\uFF0C\u4E00\u6B21\u53EA\u7559\u4E00\u4E2A in_progress\u3002\u5F85\u529E\u4F1A\u81EA\u52A8\u6C47\u603B\u5230 .zcode/plans/progress-<sessionId>.md\u3002\u786E\u9700\u539F\u751F plan \u6A21\u5F0F\u65F6\uFF0C\u8BBE PLAN_LEDGER_ALLOW_PLAN_MODE=1\u3002";
 async function main() {
   if (disabled()) return;
   const input = await readHookInput();
@@ -92,6 +96,14 @@ async function main() {
   if (isSubagent(input)) return;
   const sessionId = input.session_id ?? "";
   if (!sessionId) return;
+  if (input.tool_name === "EnterPlanMode") {
+    if (!blocksPlanMode()) return;
+    emit("PreToolUse", {
+      permissionDecision: "deny",
+      permissionDecisionReason: DENY_PLAN_MODE
+    });
+    return;
+  }
   if (input.tool_name !== "ExitPlanMode") return;
   const plan = input.tool_input?.["plan"];
   if (typeof plan !== "string" || !plan.trim()) return;

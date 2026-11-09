@@ -24,6 +24,8 @@ export interface HookInput {
   mode?: string;
   /** Stop 事件：上一轮已经因为 Stop hook 继续过一次 */
   stop_hook_active?: boolean;
+  /** UserPromptSubmit 事件：用户本轮提问的原文 */
+  prompt?: string;
 }
 
 export function readStdin(): Promise<string> {

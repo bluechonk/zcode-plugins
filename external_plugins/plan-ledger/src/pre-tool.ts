@@ -41,6 +41,23 @@ function genericTitleOf(plan: string): string | null {
   return null;
 }
 
+/**
+ * 是否拦下 EnterPlanMode。
+ *
+ * 默认拦：ZCode 的 plan 模式产出的是「流程引导文档」，不是可执行状态，而且每次
+ * 都要用户审批 ExitPlanMode。本插件用 TodoWrite 当状态机，不需要这一层。
+ * 设 PLAN_LEDGER_ALLOW_PLAN_MODE=1 可放行，保留给确实想用原生 plan 的场景。
+ */
+function blocksPlanMode(): boolean {
+  return process.env["PLAN_LEDGER_ALLOW_PLAN_MODE"] !== "1";
+}
+
+const DENY_PLAN_MODE =
+  "[plan-ledger] 不用 ZCode 内置 plan 模式：它产出的是流程文档而非可执行状态，且每次都要审批。" +
+  "请直接用 TodoWrite 拆解任务——每项写清「做什么 + 怎么算完成」，按依赖排序，" +
+  "一次只留一个 in_progress。待办会自动汇总到 .zcode/plans/progress-<sessionId>.md。" +
+  "确需原生 plan 模式时，设 PLAN_LEDGER_ALLOW_PLAN_MODE=1。";
+
 async function main(): Promise<void> {
   if (disabled()) return;
 
@@ -50,6 +67,17 @@ async function main(): Promise<void> {
 
   const sessionId = input.session_id ?? "";
   if (!sessionId) return;
+
+  // 拦原生 plan 模式：让模型改用 TodoWrite 状态机
+  if (input.tool_name === "EnterPlanMode") {
+    if (!blocksPlanMode()) return;
+    emit("PreToolUse", {
+      permissionDecision: "deny",
+      permissionDecisionReason: DENY_PLAN_MODE,
+    });
+    return;
+  }
+
   if (input.tool_name !== "ExitPlanMode") return;
 
   // ExitPlanMode 的 plan 参数就是批准后的完整计划。

@@ -1,11 +1,11 @@
-// 本文件由 scripts/build.mjs 从 external_plugins/plan-ledger/src/post-tool.ts 生成。
+// 本文件由 scripts/build.mjs 从 external_plugins/plan-with-files/src/post-tool.ts 生成。
 // 请修改源码并重跑 `npm run build`，不要直接编辑本文件。
 
 
-// external_plugins/plan-ledger/src/post-tool.ts
+// external_plugins/plan-with-files/src/post-tool.ts
 import { join as join4 } from "node:path";
 
-// external_plugins/plan-ledger/src/lib/hook.ts
+// external_plugins/plan-with-files/src/lib/hook.ts
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
@@ -34,7 +34,7 @@ function isSubagent(input) {
   return agent !== "" && agent !== "zcode-agent";
 }
 function stateDir() {
-  return process.env["ZCODE_PLUGIN_DATA"] ?? process.env["CLAUDE_PLUGIN_DATA"] ?? join(homedir(), ".zcode", "plan-ledger");
+  return process.env["ZCODE_PLUGIN_DATA"] ?? process.env["CLAUDE_PLUGIN_DATA"] ?? join(homedir(), ".zcode", "plan-with-files");
 }
 function statePath(sessionId, name) {
   const safe = sessionId.replace(/[^A-Za-z0-9_.-]/g, "_") || "default";
@@ -60,10 +60,10 @@ function envFlag(name) {
   return process.env[name] === "1";
 }
 function disabled() {
-  return envFlag("PLAN_LEDGER_DISABLE") || process.env["ZCODE_PLAN_GATE"] === "off";
+  return envFlag("PLAN_WITH_FILES_DISABLE") || process.env["ZCODE_PLAN_GATE"] === "off";
 }
 
-// external_plugins/plan-ledger/src/lib/consistency.ts
+// external_plugins/plan-with-files/src/lib/consistency.ts
 function checkConsistency(input) {
   const out = [];
   const { goal, todos, planPath, phases } = input;
@@ -102,7 +102,7 @@ function checkConsistency(input) {
   return out;
 }
 
-// external_plugins/plan-ledger/src/lib/ledger.ts
+// external_plugins/plan-with-files/src/lib/ledger.ts
 import { mkdirSync as mkdirSync2, readdirSync, rmSync, statSync, writeFileSync as writeFileSync2 } from "node:fs";
 import { join as join2 } from "node:path";
 var MAX_ACTIVITY_LINES = 15;
@@ -188,7 +188,7 @@ function pruneLedgers(plansDir, max = MAX_LEDGERS) {
   }
 }
 
-// external_plugins/plan-ledger/src/lib/zcode-db.ts
+// external_plugins/plan-with-files/src/lib/zcode-db.ts
 import { DatabaseSync } from "node:sqlite";
 import { existsSync, readFileSync as readFileSync3, readdirSync as readdirSync2 } from "node:fs";
 import { homedir as homedir2 } from "node:os";
@@ -274,7 +274,7 @@ function readPlan(cwd, sessionId) {
   }
 }
 
-// external_plugins/plan-ledger/src/post-tool.ts
+// external_plugins/plan-with-files/src/post-tool.ts
 function stamp() {
   return (/* @__PURE__ */ new Date()).toISOString().slice(11, 16);
 }

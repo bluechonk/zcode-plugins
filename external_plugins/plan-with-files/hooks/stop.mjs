@@ -1,8 +1,8 @@
-// 本文件由 scripts/build.mjs 从 external_plugins/plan-ledger/src/stop.ts 生成。
+// 本文件由 scripts/build.mjs 从 external_plugins/plan-with-files/src/stop.ts 生成。
 // 请修改源码并重跑 `npm run build`，不要直接编辑本文件。
 
 
-// external_plugins/plan-ledger/src/lib/hook.ts
+// external_plugins/plan-with-files/src/lib/hook.ts
 function readStdin() {
   return new Promise((resolve) => {
     let data = "";
@@ -34,10 +34,10 @@ function envFlag(name) {
   return process.env[name] === "1";
 }
 function disabled() {
-  return envFlag("PLAN_LEDGER_DISABLE") || process.env["ZCODE_PLAN_GATE"] === "off";
+  return envFlag("PLAN_WITH_FILES_DISABLE") || process.env["ZCODE_PLAN_GATE"] === "off";
 }
 
-// external_plugins/plan-ledger/src/lib/consistency.ts
+// external_plugins/plan-with-files/src/lib/consistency.ts
 function checkConsistency(input) {
   const out = [];
   const { goal, todos, planPath, phases } = input;
@@ -76,7 +76,7 @@ function checkConsistency(input) {
   return out;
 }
 
-// external_plugins/plan-ledger/src/lib/zcode-db.ts
+// external_plugins/plan-with-files/src/lib/zcode-db.ts
 import { DatabaseSync } from "node:sqlite";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { homedir } from "node:os";
@@ -162,7 +162,7 @@ function readPlan(cwd, sessionId) {
   }
 }
 
-// external_plugins/plan-ledger/src/stop.ts
+// external_plugins/plan-with-files/src/stop.ts
 async function main() {
   if (disabled()) return;
   const input = await readHookInput();
@@ -184,7 +184,7 @@ async function main() {
   });
   if (issues.length === 0) return;
   emit("Stop", {
-    additionalContext: ["[plan-ledger] \u8BA1\u5212 / \u76EE\u6807 / \u5F85\u529E\u4E4B\u95F4\u5B58\u5728\u4E0D\u4E00\u81F4\uFF1A", "", ...issues].join("\n")
+    additionalContext: ["[plan-with-files] \u8BA1\u5212 / \u76EE\u6807 / \u5F85\u529E\u4E4B\u95F4\u5B58\u5728\u4E0D\u4E00\u81F4\uFF1A", "", ...issues].join("\n")
   });
 }
 main().then(() => process.exit(0)).catch(() => process.exit(0));

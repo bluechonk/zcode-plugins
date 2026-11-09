@@ -70,7 +70,7 @@ function looksMultiStep(prompt: string): boolean {
 }
 
 const TEMPLATE = [
-  "[plan-ledger] 这看起来是多步任务。建议先用 TodoWrite 拆解，不需要进入 plan 模式：",
+  "[plan-with-files] 这看起来是多步任务。建议先用 TodoWrite 拆解，不需要进入 plan 模式：",
   "",
   "1. 每项写清「做什么 + 怎么算完成」——验收标准比动作描述更重要",
   "2. 按依赖顺序排 position，被依赖的在前",
@@ -84,6 +84,25 @@ const TEMPLATE = [
   "待办会写进 .zcode/plans/progress-<sessionId>.md，随时可查当前进度。",
 ].join("\n");
 
+/**
+ * 原生 plan 模式冲突提示。
+ *
+ * 拦不住用户手动 /plan：状态切换走 applyRuntimeExecutionState，那里没有任何
+ * hook 调用点（源码实证）。但两个 hook 的入参都带 mode，所以能检测到并提醒。
+ *
+ * 为什么必须提醒：原生 plan 会注入自己的 5 Phase 提示词，与本插件的规划模板
+ * 同时存在，模型可能同时收到两套互斥的指示。
+ */
+const CONFLICT_NOTICE = [
+  "[plan-with-files] 检测到原生 plan 模式已开启，与本插件冲突：",
+  "",
+  "- 原生 plan 会注入 5 Phase 提示词，与本插件的规划模板同时生效",
+  "- 它的计划写进 .zcode/plans/ 且永久累积，没有清理机制",
+  "- 提交计划要审批，打断流程",
+  "",
+  "建议切到 build 模式，用 TodoWrite 拆解任务。本插件的台账会接管进度追踪。",
+].join("\n");
+
 async function main(): Promise<void> {
   if (disabled()) return;
 
@@ -93,6 +112,13 @@ async function main(): Promise<void> {
 
   const sessionId = input.session_id ?? "";
   if (!sessionId) return;
+
+  // 冲突优先：原生 plan 开着时先提醒退出，不再叠加规划模板
+  const mode = input.mode ?? input.permission_mode ?? "";
+  if (mode === "plan") {
+    emit("UserPromptSubmit", { additionalContext: CONFLICT_NOTICE });
+    return;
+  }
 
   const prompt = typeof input.prompt === "string" ? input.prompt : "";
   if (!looksMultiStep(prompt)) return;

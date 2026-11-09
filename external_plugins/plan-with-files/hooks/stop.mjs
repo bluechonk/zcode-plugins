@@ -2,6 +2,10 @@
 // 请修改源码并重跑 `npm run build`，不要直接编辑本文件。
 
 
+// external_plugins/plan-with-files/src/stop.ts
+import { existsSync as existsSync2, readFileSync as readFileSync2 } from "node:fs";
+import { join as join2 } from "node:path";
+
 // external_plugins/plan-with-files/src/lib/hook.ts
 function readStdin() {
   return new Promise((resolve) => {
@@ -81,7 +85,7 @@ import { DatabaseSync } from "node:sqlite";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-var DB_PATH = join(homedir(), ".zcode", "cli", "db", "db.sqlite");
+var DB_PATH = process.env["PLAN_WITH_FILES_DB"] ?? join(homedir(), ".zcode", "cli", "db", "db.sqlite");
 function withDb(fn, fallback) {
   try {
     const db = new DatabaseSync(DB_PATH, { readOnly: true });
@@ -182,9 +186,28 @@ async function main() {
     planPath: plan?.path ?? null,
     phases: plan?.phases ?? []
   });
-  if (issues.length === 0) return;
-  emit("Stop", {
-    additionalContext: ["[plan-with-files] \u8BA1\u5212 / \u76EE\u6807 / \u5F85\u529E\u4E4B\u95F4\u5B58\u5728\u4E0D\u4E00\u81F4\uFF1A", "", ...issues].join("\n")
-  });
+  const findingsNote = emptyFindings(cwd) ? FINDINGS_REMINDER : null;
+  if (issues.length === 0 && !findingsNote) return;
+  const lines = [];
+  if (issues.length > 0) {
+    lines.push("[plan-with-files] \u8BA1\u5212 / \u76EE\u6807 / \u5F85\u529E\u4E4B\u95F4\u5B58\u5728\u4E0D\u4E00\u81F4\uFF1A", "", ...issues);
+  }
+  if (findingsNote) {
+    if (lines.length > 0) lines.push("");
+    lines.push(findingsNote);
+  }
+  emit("Stop", { additionalContext: lines.join("\n") });
+}
+var FINDINGS_REMINDER = "[plan-with-files] findings.md \u8FD8\u662F\u7A7A\u9AA8\u67B6\u3002\u5982\u679C\u672C\u8F6E\u505A\u8FC7\u8C03\u7814\u3001\u6280\u672F\u9009\u578B\u6216\u8E29\u8FC7\u5751\uFF0C\u628A\u7ED3\u8BBA\u8BB0\u8FDB\u53BB\u2014\u2014\u90A3\u662F\u552F\u4E00\u4E0D\u7531\u63D2\u4EF6\u751F\u6210\u7684\u6587\u4EF6\uFF0C\u4E0A\u4E0B\u6587\u538B\u7F29\u540E\u5C31\u6CA1\u4E86\u3002";
+function emptyFindings(cwd) {
+  const p = join2(cwd, "findings.md");
+  if (!existsSync2(p)) return false;
+  try {
+    const text = readFileSync2(p, "utf8");
+    const body = text.split("\n").map((l) => l.trim()).filter((l) => l && !l.startsWith("#") && !l.startsWith(">") && !l.startsWith("|") && !l.startsWith("-")).filter((l) => !/^（.*）$/u.test(l)).join("").replace(/\s+/g, "");
+    return body.length === 0;
+  } catch {
+    return false;
+  }
 }
 main().then(() => process.exit(0)).catch(() => process.exit(0));

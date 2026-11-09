@@ -3,7 +3,8 @@
 
 
 // external_plugins/plan-with-files/src/post-tool.ts
-import { join as join4 } from "node:path";
+import { existsSync as existsSync2 } from "node:fs";
+import { join as join5 } from "node:path";
 
 // external_plugins/plan-with-files/src/lib/hook.ts
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -102,85 +103,143 @@ function checkConsistency(input) {
   return out;
 }
 
-// external_plugins/plan-with-files/src/lib/ledger.ts
-import { mkdirSync as mkdirSync2, readdirSync, rmSync, statSync, writeFileSync as writeFileSync2 } from "node:fs";
+// external_plugins/plan-with-files/src/lib/files.ts
+import { mkdirSync as mkdirSync2, writeFileSync as writeFileSync2 } from "node:fs";
 import { join as join2 } from "node:path";
-var MAX_ACTIVITY_LINES = 15;
-var MAX_LEDGERS = 200;
-var STATUS_MARK = {
-  completed: "x",
-  in_progress: ">",
-  pending: " "
-};
 function short(text, n) {
   const one = text.replace(/\s+/g, " ").trim();
   return one.length <= n ? one : `${one.slice(0, n)}\u2026`;
 }
-function renderLedger(input) {
-  const { todos } = input;
-  const done = todos.filter((t) => t.status === "completed").length;
-  const doing = todos.filter((t) => t.status === "in_progress").length;
-  const todo = todos.filter((t) => t.status === "pending").length;
-  const now = (/* @__PURE__ */ new Date()).toISOString().replace("T", " ").slice(0, 16);
-  const lines = ["# \u8BA1\u5212\u8FDB\u5EA6", ""];
-  lines.push(`- \u4F1A\u8BDD: ${input.sessionId}`);
-  lines.push(`- \u8BA1\u5212: ${input.planPath ?? "\uFF08\u672C\u4F1A\u8BDD\u6CA1\u6709\u8BA1\u5212\u6587\u4EF6\uFF09"}`);
-  if (input.goal) {
-    const g = input.goal;
-    lines.push(
-      `- \u76EE\u6807: ${g.status} \xB7 ${short(g.objective, 60)} \xB7 \u5DF2\u7528 ${g.tokensUsed.toLocaleString("en-US")} tokens`
-    );
-  } else {
-    lines.push("- \u76EE\u6807: \u65E0\uFF08\u672A\u8BBE\u7F6E /goal\uFF09");
-  }
-  lines.push(`- \u66F4\u65B0: ${now}`, "");
-  lines.push("## \u5F53\u524D\u5F85\u529E", "");
-  if (todos.length === 0) {
-    lines.push("- \uFF08\u672C\u4F1A\u8BDD\u8FD8\u6CA1\u6709\u5F85\u529E\uFF09");
-  } else {
-    for (const t of todos) {
-      lines.push(`- [${STATUS_MARK[t.status] ?? " "}] ${t.content}`);
-    }
-    lines.push("", `\u7EDF\u8BA1\uFF1A${todos.length} \u9879 \xB7 \u5B8C\u6210 ${done} \xB7 \u8FDB\u884C\u4E2D ${doing} \xB7 \u672A\u5F00\u59CB ${todo}`);
-  }
+function phaseStatus(phase, todos) {
+  const key = short(phase, 12);
+  const related = todos.filter((t) => t.content.includes(key) || key.includes(short(t.content, 12)));
+  if (related.length === 0) return null;
+  if (related.every((t) => t.status === "completed")) return "complete";
+  if (related.some((t) => t.status === "in_progress")) return "in_progress";
+  return "pending";
+}
+function renderTaskPlan(input) {
+  const open = input.todos.filter((t) => t.status !== "completed");
+  const doing = input.todos.find((t) => t.status === "in_progress");
+  const next = doing?.content ?? open[0]?.content ?? "\uFF08\u65E0\u5F85\u529E\uFF0C\u4EFB\u52A1\u53EF\u80FD\u5DF2\u6536\u5C3E\uFF09";
+  const lines = ["# \u4EFB\u52A1\u8BA1\u5212", ""];
+  lines.push(`- \u4F1A\u8BDD\uFF1A${input.sessionId}`);
+  lines.push(`- \u66F4\u65B0\uFF1A${(/* @__PURE__ */ new Date()).toISOString().replace("T", " ").slice(0, 16)}`);
   lines.push("");
-  lines.push("## \u8BA1\u5212\u9636\u6BB5", "");
+  lines.push("## \u76EE\u6807", "");
+  lines.push(input.goal ? short(input.goal.objective, 200) : "\uFF08\u672A\u8BBE\u7F6E /goal\uFF09");
+  lines.push("");
+  lines.push("## \u4E0B\u4E00\u6B65", "");
+  lines.push(short(next, 160));
+  lines.push("");
+  lines.push("## \u9636\u6BB5", "");
   if (input.phases.length === 0) {
-    lines.push("- \uFF08\u65E0\u8BA1\u5212\u6587\u4EF6\u6216\u672A\u63D0\u53D6\u5230\u9636\u6BB5\u6807\u9898\uFF09");
+    lines.push("\uFF08\u65E0\u8BA1\u5212\u6587\u4EF6\uFF0C\u6216\u672A\u63D0\u53D6\u5230\u9636\u6BB5\u6807\u9898\uFF09");
   } else {
-    input.phases.forEach((p, i) => lines.push(`${i + 1}. ${p}`));
+    for (const [i, phase] of input.phases.entries()) {
+      const status = phaseStatus(phase, input.todos) ?? "pending";
+      lines.push(`### \u9636\u6BB5 ${i + 1}\uFF1A${phase}`);
+      lines.push(`- **\u72B6\u6001**\uFF1A${status}`);
+      lines.push("");
+    }
   }
-  lines.push("", "> \u9636\u6BB5\u4EC5\u4F5C\u5BFC\u822A\uFF1B\u5B8C\u6210\u5EA6\u4EE5\u300C\u5F53\u524D\u5F85\u529E\u300D\u4E3A\u51C6\uFF0C\u76EE\u6807\u5C42\u4EE5 /goal \u4E3A\u51C6\u3002", "");
   if (input.consistency.length > 0) {
-    lines.push("## \u4E00\u81F4\u6027", "");
+    lines.push("## \u4E00\u81F4\u6027\u68C0\u67E5", "");
     for (const c of input.consistency) lines.push(`- ${c}`);
     lines.push("");
   }
-  if (input.events.length > 0) {
-    lines.push("## \u6D3B\u52A8\u7EBF", "", "| \u65F6\u95F4 | \u4E8B\u4EF6 | \u53D8\u5316 |", "| --- | --- | --- |");
-    for (const e of input.events.slice(-MAX_ACTIVITY_LINES)) {
+  lines.push("> \u672C\u6587\u4EF6\u7531\u63D2\u4EF6\u4ECE\u4F1A\u8BDD\u5E93\u6D3E\u751F\uFF0C\u4E0D\u8981\u624B\u6539\u2014\u2014\u6539\u4E86\u4E0B\u6B21\u4F1A\u88AB\u8986\u76D6\u3002");
+  return `${lines.join("\n")}
+`;
+}
+function renderProgress(input) {
+  const done = input.todos.filter((t) => t.status === "completed").length;
+  const lines = ["# \u8FDB\u5EA6\u65E5\u5FD7", ""];
+  lines.push(`- \u4F1A\u8BDD\uFF1A${input.sessionId}`);
+  lines.push(`- \u66F4\u65B0\uFF1A${(/* @__PURE__ */ new Date()).toISOString().replace("T", " ").slice(0, 16)}`);
+  lines.push("");
+  lines.push("## \u5F53\u524D\u5F85\u529E", "");
+  if (input.todos.length === 0) {
+    lines.push("\uFF08\u8FD8\u6CA1\u6709\u5F85\u529E\uFF09");
+  } else {
+    for (const t of input.todos) {
+      const mark = t.status === "completed" ? "x" : t.status === "in_progress" ? ">" : " ";
+      lines.push(`- [${mark}] ${t.content}`);
+    }
+    lines.push("", `\u5B8C\u6210 ${done} / ${input.todos.length}`);
+  }
+  lines.push("");
+  lines.push("## \u6D3B\u52A8\u7EBF", "");
+  if (input.events.length === 0) {
+    lines.push("\uFF08\u6682\u65E0\u8BB0\u5F55\uFF09");
+  } else {
+    lines.push("| \u65F6\u95F4 | \u4E8B\u4EF6 | \u53D8\u5316 |", "| --- | --- | --- |");
+    for (const e of input.events.slice(-40)) {
       lines.push(`| ${e.at} | ${e.event} | ${e.detail} |`);
     }
-    lines.push("");
   }
-  return lines.join("\n");
+  lines.push("");
+  lines.push("> \u672C\u6587\u4EF6\u7531\u63D2\u4EF6\u4ECE\u4F1A\u8BDD\u5E93\u6D3E\u751F\uFF0C\u4E0D\u8981\u624B\u6539\u2014\u2014\u6539\u4E86\u4E0B\u6B21\u4F1A\u88AB\u8986\u76D6\u3002");
+  return `${lines.join("\n")}
+`;
 }
-function ledgerPath(cwd, sessionId, planPath) {
-  const safe = sessionId.replace(/[^A-Za-z0-9._-]/g, "_");
-  if (planPath) return join2(planPath, "..", `progress-${safe}.md`);
-  return join2(cwd, ".zcode", "plans", `progress-${safe}.md`);
+function findingsSkeleton() {
+  return [
+    "# \u8C03\u7814\u4E0E\u51B3\u7B56",
+    "",
+    "> \u672C\u6587\u4EF6\u7531\u4F60\u7EF4\u62A4\uFF1A\u8BB0\u5F55\u8C03\u7814\u7ED3\u679C\u3001\u6280\u672F\u51B3\u7B56\u4E0E\u7406\u7531\u3001\u9047\u5230\u7684\u95EE\u9898\u3002",
+    "> \u8FD9\u662F\u4E09\u4E2A\u89C4\u5212\u6587\u4EF6\u91CC\u552F\u4E00\u4E0D\u7531\u63D2\u4EF6\u751F\u6210\u7684\u2014\u2014\u6570\u636E\u5E93\u91CC\u6CA1\u6709\u8FD9\u4E9B\u4FE1\u606F\uFF0C\u538B\u7F29\u540E\u5C31\u4E22\u4E86\u3002",
+    "",
+    "## \u9700\u6C42",
+    "",
+    "\uFF08\u7528\u6237\u8981\u4EC0\u4E48\uFF0C\u5177\u4F53\u5230\u53EF\u9A8C\u6536\uFF09",
+    "",
+    "## \u8C03\u7814\u7ED3\u679C",
+    "",
+    "\uFF08\u67E5\u5230\u4E86\u4EC0\u4E48\uFF0C\u5E26\u6765\u6E90\uFF09",
+    "",
+    "## \u6280\u672F\u51B3\u7B56",
+    "",
+    "| \u51B3\u7B56 | \u7406\u7531 |",
+    "| --- | --- |",
+    "|  |  |",
+    "",
+    "## \u9047\u5230\u7684\u95EE\u9898",
+    "",
+    "| \u95EE\u9898 | \u5904\u7406 |",
+    "| --- | --- |",
+    "|  |  |",
+    ""
+  ].join("\n");
 }
-function writeLedger(path, content) {
+function planFilePaths(cwd) {
+  return {
+    plan: join2(cwd, "task_plan.md"),
+    findings: join2(cwd, "findings.md"),
+    progress: join2(cwd, "progress.md")
+  };
+}
+function writeIfChanged(path, content) {
   try {
     mkdirSync2(join2(path, ".."), { recursive: true });
     writeFileSync2(path, content, "utf8");
   } catch {
   }
 }
+
+// external_plugins/plan-with-files/src/lib/ledger.ts
+import { mkdirSync as mkdirSync3, readdirSync, rmSync, statSync, writeFileSync as writeFileSync3 } from "node:fs";
+import { join as join3 } from "node:path";
+var MAX_LEDGERS = 200;
+function ledgerPath(cwd, sessionId, planPath) {
+  const safe = sessionId.replace(/[^A-Za-z0-9._-]/g, "_");
+  if (planPath) return join3(planPath, "..", `progress-${safe}.md`);
+  return join3(cwd, ".zcode", "plans", `progress-${safe}.md`);
+}
 function pruneLedgers(plansDir, max = MAX_LEDGERS) {
   try {
     const stale = readdirSync(plansDir).filter((f) => /^progress-.+\.md$/u.test(f)).map((f) => {
-      const p = join2(plansDir, f);
+      const p = join3(plansDir, f);
       return { p, mtime: statSync(p).mtimeMs };
     }).sort((a, b) => b.mtime - a.mtime).slice(max);
     for (const { p } of stale) rmSync(p, { force: true });
@@ -192,8 +251,8 @@ function pruneLedgers(plansDir, max = MAX_LEDGERS) {
 import { DatabaseSync } from "node:sqlite";
 import { existsSync, readFileSync as readFileSync3, readdirSync as readdirSync2 } from "node:fs";
 import { homedir as homedir2 } from "node:os";
-import { join as join3 } from "node:path";
-var DB_PATH = join3(homedir2(), ".zcode", "cli", "db", "db.sqlite");
+import { join as join4 } from "node:path";
+var DB_PATH = process.env["PLAN_WITH_FILES_DB"] ?? join4(homedir2(), ".zcode", "cli", "db", "db.sqlite");
 function withDb(fn, fallback) {
   try {
     const db = new DatabaseSync(DB_PATH, { readOnly: true });
@@ -241,9 +300,9 @@ function findPlanFile(cwd, sessionId) {
   const name = `plan-${sessionId.replace(/[^A-Za-z0-9._-]/g, "-")}.md`;
   let dir = cwd;
   for (let depth = 0; depth < 6; depth++) {
-    const candidate = join3(dir, ".zcode", "plans", name);
+    const candidate = join4(dir, ".zcode", "plans", name);
     if (existsSync(candidate)) return candidate;
-    const parent = join3(dir, "..");
+    const parent = join4(dir, "..");
     if (parent === dir) break;
     dir = parent;
   }
@@ -300,17 +359,21 @@ async function main() {
   events.push({ at: stamp(), event: tool, detail });
   writeState(sessionId, "ledger", { events: events.slice(-40), todoSig: sig });
   const consistency = checkConsistency({ goal, todos, planPath: plan?.path ?? null, phases });
-  const content = renderLedger({
+  const payload = {
     sessionId,
-    planPath: plan?.path ?? null,
-    phases,
+    cwd,
     goal,
     todos,
+    phases,
+    planPath: plan?.path ?? null,
     events,
     consistency
-  });
+  };
+  const paths = planFilePaths(cwd);
+  writeIfChanged(paths.plan, renderTaskPlan(payload));
+  writeIfChanged(paths.progress, renderProgress(payload));
+  if (!existsSync2(paths.findings)) writeIfChanged(paths.findings, findingsSkeleton());
   const ledger = ledgerPath(cwd, sessionId, plan?.path ?? null);
-  writeLedger(ledger, content);
-  pruneLedgers(join4(ledger, ".."));
+  pruneLedgers(join5(ledger, ".."));
 }
 main().then(() => process.exit(0)).catch(() => process.exit(0));

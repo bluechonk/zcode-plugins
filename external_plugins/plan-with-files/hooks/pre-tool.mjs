@@ -67,7 +67,7 @@ function disabled() {
 import { DatabaseSync } from "node:sqlite";
 import { homedir as homedir2 } from "node:os";
 import { join as join2 } from "node:path";
-var DB_PATH = join2(homedir2(), ".zcode", "cli", "db", "db.sqlite");
+var DB_PATH = process.env["PLAN_WITH_FILES_DB"] ?? join2(homedir2(), ".zcode", "cli", "db", "db.sqlite");
 var NON_STEP_HEADINGS = /^(context|背景|目标|验证|测试|交付|风险|回滚|备注|附录|summary|verification|delivery)/i;
 function extractPhases(planText) {
   const out = [];

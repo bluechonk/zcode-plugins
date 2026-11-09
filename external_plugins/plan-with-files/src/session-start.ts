@@ -68,6 +68,18 @@ async function main(): Promise<void> {
     lines.push("", "未完成项优先；已完成的部分不要重做。");
   }
 
+  // 三个规划文件的落点与职责，只在首轮说一次
+  if (turns === 1) {
+    lines.push(
+      "",
+      "规划文件（项目根）：",
+      "- task_plan.md：目标 / 下一步 / 阶段状态，插件派生，不要手改",
+      "- progress.md：活动线与待办快照，插件派生，不要手改",
+      "- findings.md：调研结果与技术决策，由你维护——这是唯一不由插件生成的文件，"
+        + "数据库里没有这些信息，上下文压缩后就丢了"
+    );
+  }
+
   emit("SessionStart", { additionalContext: lines.join("\n") });
 }
 

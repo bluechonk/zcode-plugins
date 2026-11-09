@@ -15,7 +15,9 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-const DB_PATH = join(homedir(), ".zcode", "cli", "db", "db.sqlite");
+// 允许用 PLAN_WITH_FILES_DB 指向副本库：便于在不动真库的前提下验证判定逻辑
+const DB_PATH =
+  process.env["PLAN_WITH_FILES_DB"] ?? join(homedir(), ".zcode", "cli", "db", "db.sqlite");
 
 export interface TodoItem {
   content: string;

@@ -98,7 +98,7 @@ function readGoal(sessionId) {
 }
 
 // external_plugins/plan-ledger/src/pre-tool.ts
-var DB_PATH2 = join3(homedir3(), ".zcode", "cli", "db", "db.sqlite");
+var DB_PATH2 = process.env["PLAN_LEDGER_DB"] ?? join3(homedir3(), ".zcode", "cli", "db", "db.sqlite");
 var ALWAYS_ALLOW = /* @__PURE__ */ new Set([
   "TodoWrite",
   "TodoRead",
@@ -125,20 +125,28 @@ var PLAN_QUERY = `
 SELECT
   EXISTS(
     SELECT 1 FROM part
-    WHERE session_id = ?
-      AND json_extract(data, '$.tool') = 'TodoWrite'
+    WHERE session_id = :sid
+      AND json_extract(data, '$.tool') IN ('TodoWrite', 'ExitPlanMode')
       AND time_created >= COALESCE(
         (SELECT MAX(time_created) FROM message
-         WHERE session_id = ? AND json_extract(data, '$.semantics.kind') = 'user_prompt'),
+         WHERE session_id = :sid AND json_extract(data, '$.semantics.kind') = 'user_prompt'),
+        0)
+  )
+  OR EXISTS(
+    SELECT 1 FROM todo
+    WHERE session_id = :sid
+      AND time_updated >= COALESCE(
+        (SELECT MAX(time_created) FROM message
+         WHERE session_id = :sid AND json_extract(data, '$.semantics.kind') = 'user_prompt'),
         0)
   ) AS planned,
   (
     SELECT COUNT(*) FROM part
-    WHERE session_id = ?
+    WHERE session_id = :sid
       AND json_extract(data, '$.type') = 'tool'
       AND time_created > COALESCE(
         (SELECT MAX(time_created) FROM part
-         WHERE session_id = ? AND json_extract(data, '$.tool') = 'TodoWrite'),
+         WHERE session_id = :sid AND json_extract(data, '$.tool') IN ('TodoWrite', 'ExitPlanMode')),
         0)
   ) AS calls_since_todo
 `;
@@ -146,7 +154,7 @@ function readPlanState(sessionId) {
   try {
     const db = new DatabaseSync2(DB_PATH2, { readOnly: true });
     try {
-      const row = db.prepare(PLAN_QUERY).get(sessionId, sessionId, sessionId, sessionId);
+      const row = db.prepare(PLAN_QUERY).get({ sid: sessionId });
       return {
         planned: Boolean(row?.planned),
         calls: Number(row?.calls_since_todo ?? 0)
@@ -156,6 +164,28 @@ function readPlanState(sessionId) {
     }
   } catch {
     return null;
+  }
+}
+function plannerBroken(sessionId) {
+  try {
+    const db = new DatabaseSync2(DB_PATH2, { readOnly: true });
+    try {
+      const row = db.prepare(
+        `SELECT COUNT(*) AS c FROM part
+           WHERE session_id = :sid
+             AND json_extract(data, '$.tool') = 'DeferredToolCall'
+             AND json_extract(data, '$.state.status') = 'error'
+             AND time_created >= COALESCE(
+               (SELECT MAX(time_created) FROM message
+                WHERE session_id = :sid AND json_extract(data, '$.semantics.kind') = 'user_prompt'),
+               0)`
+      ).get({ sid: sessionId });
+      return Number(row?.c ?? 0) > 0;
+    } finally {
+      db.close();
+    }
+  } catch {
+    return false;
   }
 }
 async function main() {
@@ -185,6 +215,7 @@ async function main() {
   const state = readPlanState(sessionId);
   if (!state) return;
   if (!state.planned) {
+    if (plannerBroken(sessionId)) return;
     emit("PreToolUse", {
       permissionDecision: "deny",
       permissionDecisionReason: DENY_REASON

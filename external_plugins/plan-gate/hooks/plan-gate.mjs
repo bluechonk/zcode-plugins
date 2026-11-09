@@ -16,9 +16,9 @@ import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-// observe：只记日志，从不拦截（用于验证插件 hook 是否真的被执行）
+// observe：只记日志，从不拦截
 // enforce：按规则拦截并落盘
-const MODE = "observe";
+const MODE = "enforce";
 
 const DB_PATH = join(homedir(), ".zcode", "cli", "db", "db.sqlite");
 const PROGRESS_DIR = join(homedir(), ".zcode", "progress");

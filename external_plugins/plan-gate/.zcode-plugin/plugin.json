@@ -1,6 +1,6 @@
 {
   "name": "plan-gate",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Deny state-changing tools until the current turn is planned with TodoWrite, and mirror the todo list to disk.",
   "description_i18n": {
     "en": "Deny state-changing tools until the current turn is planned with TodoWrite, and mirror the todo list to disk.",

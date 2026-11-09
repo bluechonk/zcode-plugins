@@ -17,8 +17,9 @@ external_plugins/                      社区插件（官方约定的伙伴/社�
     hooks/plan-gate.mjs                门禁脚本（observe / enforce 双模式）
     skills/plan-gate/SKILL.md          说明被拦截时怎么办
   security-review/                     安全审查
-    src/index.ts                       TypeScript 源码（唯一手改处）
-    hooks/security-review.mjs          构建产物（不要手改）
+    src/*.ts                           入口（每个顶层 .ts 产出一个 hook）
+    src/lib/                           共享代码，被打进各入口
+    hooks/*.mjs                        构建产物（不要手改）
 assets/                                条目图标（catalog 的 icon 指向各自 raw 地址）
 scripts/validate.py                    市场与插件清单校验（取自 zai-org/zcode-plugins，Apache-2.0）
 scripts/build.mjs                      插件构建：src/*.ts → hooks/*.mjs
@@ -54,7 +55,7 @@ python3 scripts/validate.py
 | --- | --- | --- | --- |
 | DeepSeek 联网搜索 | `deepseek-web-search` | DeepSeek 官方联网搜索与网页抓取 | Node.js >= 18；`DEEPSEEK_API_KEY` |
 | 规划门禁 | `plan-gate` | 本轮未规划时拦截会改状态的工具调用 | Node.js >= 22.5（内置 `node:sqlite`） |
-| 安全审查 | `security-review` | 编辑后即时扫一遍新增内容，命中安全模式即提示 | Node.js >= 22 |
+| 安全审查 | `security-review` | 编辑后即时扫安全模式；每轮收尾用当前模型审本轮 git diff | Node.js >= 22 |
 
 各自的组件、用法与配置见对应插件的 README：
 

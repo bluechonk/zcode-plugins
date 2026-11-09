@@ -1,8 +1,8 @@
-// 本文件由 scripts/build.mjs 从 external_plugins/security-review/src/index.ts 生成。
+// 本文件由 scripts/build.mjs 从 external_plugins/security-review/src/post-tool.ts 生成。
 // 请修改源码并重跑 `npm run build`，不要直接编辑本文件。
 
 
-// external_plugins/security-review/src/index.ts
+// external_plugins/security-review/src/post-tool.ts
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";

@@ -1,0 +1,22 @@
+{
+  "name": "security-review",
+  "version": "0.1.0",
+  "description": "Pattern-based security warnings on edits, plus an end-of-turn LLM review of the turn's git diff run against the model ZCode is currently using.",
+  "description_i18n": {
+    "en": "Pattern-based security warnings on edits, plus an end-of-turn LLM review of the turn's git diff run against the model ZCode is currently using.",
+    "zh-CN": "编辑后即时做安全模式检查；每轮收尾时用 ZCode 当前在跑的模型审查本轮的 git diff。"
+  },
+  "author": {
+    "name": "bluechonk",
+    "url": "https://github.com/bluechonk"
+  },
+  "repository": "https://github.com/bluechonk/zcode-plugins",
+  "license": "MIT",
+  "keywords": [
+    "security",
+    "hooks",
+    "review",
+    "secrets",
+    "injection"
+  ]
+}

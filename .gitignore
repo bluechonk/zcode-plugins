@@ -1,0 +1,7 @@
+node_modules/
+dist/
+.tmp/
+*.log
+.DS_Store
+# 本地 ZCode 配置与插件台账（会话级产物，不入库）
+.zcode/

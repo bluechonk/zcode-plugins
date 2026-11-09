@@ -1,0 +1,100 @@
+{
+  "name": "bluechonk-plugins",
+  "description": "bluechonk 的 ZCode 插件市场。",
+  "description_i18n": {
+    "en": "bluechonk's ZCode plugin marketplace.",
+    "zh-CN": "bluechonk 的 ZCode 插件市场。"
+  },
+  "owner": {
+    "name": "bluechonk",
+    "url": "https://github.com/bluechonk"
+  },
+  "plugins": [
+    {
+      "name": "deepseek-web-search",
+      "source": "./external_plugins/deepseek-web-search",
+      "version": "0.1.0",
+      "description": "DeepSeek official web search and page fetch: zero-dependency CLI plus matching commands, skills and MCP servers.",
+      "description_i18n": {
+        "en": "DeepSeek official web search and page fetch: zero-dependency CLI plus matching commands, skills and MCP servers.",
+        "zh-CN": "DeepSeek 官方联网搜索与网页抓取：零依赖 CLI，并配套 command、skill 与 MCP 服务。"
+      },
+      "displayName": "DeepSeek 联网搜索",
+      "displayName_i18n": {
+        "en": "DeepSeek Web Search",
+        "zh-CN": "DeepSeek 联网搜索"
+      },
+      "author": {
+        "name": "bluechonk",
+        "url": "https://github.com/bluechonk"
+      },
+      "category": "developer-tools",
+      "icon": "https://raw.githubusercontent.com/bluechonk/zcode-plugins/main/assets/deepseek-web-search/icon.png",
+      "homepage": "https://api-docs.deepseek.com/zh-cn/guides/search",
+      "tags": [
+        "deepseek",
+        "web-search",
+        "fetch",
+        "mcp",
+        "cli",
+        "rag"
+      ]
+    },
+    {
+      "name": "plan-ledger",
+      "source": "./external_plugins/plan-ledger",
+      "version": "0.1.0",
+      "description": "Progress ledger and three-way consistency checks across /goal, plan files and todos.",
+      "description_i18n": {
+        "en": "Progress ledger and three-way consistency checks across /goal, plan files and todos.",
+        "zh-CN": "进度台账，以及 /goal、计划文件与待办之间的三方一致性核对。"
+      },
+      "displayName": "Plan Ledger",
+      "displayName_i18n": {
+        "en": "Plan Ledger",
+        "zh-CN": "计划台账"
+      },
+      "author": {
+        "name": "bluechonk",
+        "url": "https://github.com/bluechonk"
+      },
+      "category": "utilities",
+      "icon": "https://raw.githubusercontent.com/bluechonk/zcode-plugins/main/assets/plan-gate/icon.png",
+      "tags": [
+        "hooks",
+        "todo",
+        "planning",
+        "ledger",
+        "goal"
+      ]
+    },
+    {
+      "name": "security-review",
+      "source": "./external_plugins/security-review",
+      "version": "0.1.0",
+      "description": "Pattern-based security warnings on edits, plus an end-of-turn LLM review of the turn's git diff run against the model ZCode is currently using.",
+      "description_i18n": {
+        "en": "Pattern-based security warnings on edits, plus an end-of-turn LLM review of the turn's git diff run against the model ZCode is currently using.",
+        "zh-CN": "编辑后即时做安全模式检查；每轮收尾时用 ZCode 当前在跑的模型审查本轮的 git diff。"
+      },
+      "displayName": "Security Review",
+      "displayName_i18n": {
+        "en": "Security Review",
+        "zh-CN": "安全审查"
+      },
+      "author": {
+        "name": "bluechonk",
+        "url": "https://github.com/bluechonk"
+      },
+      "category": "utilities",
+      "icon": "https://raw.githubusercontent.com/bluechonk/zcode-plugins/main/assets/security-review/icon.png",
+      "tags": [
+        "security",
+        "hooks",
+        "review",
+        "secrets",
+        "injection"
+      ]
+    }
+  ]
+}

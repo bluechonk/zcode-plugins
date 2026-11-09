@@ -1,0 +1,51 @@
+# CI：仓库结构与构建产物门禁。
+#
+# 三件事，任何一件红了都不许合：
+#   1. TypeScript 类型检查
+#   2. 插件产物与源码一致（防「改了 src 忘了 npm run build」）
+#   3. scripts/validate.py 校验 marketplace.json、各插件 manifest 与目录约定
+#
+# job 名 validate 是 main 分支保护里的必需检查，改名会让所有 PR 卡在「等待状态上报」。
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# 校验只需要读仓库
+permissions:
+  contents: read
+
+# 同一分支/PR 的旧运行自动取消，避免连续推送堆积
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: 安装依赖
+        run: npm ci
+
+      - name: 类型检查
+        run: npm run typecheck
+
+      - name: 插件产物未漂移
+        run: npm run build -- --check
+
+      - name: 校验市场与插件清单
+        run: |
+          python3 --version
+          python3 scripts/validate.py

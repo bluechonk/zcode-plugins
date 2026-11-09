@@ -1,0 +1,21 @@
+{
+  "name": "zcode-plugins",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "bluechonk 的 ZCode 插件市场：插件源码与构建管线。",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "typecheck": "tsc --noEmit",
+    "sync:local": "node scripts/sync-local-marketplace.mjs",
+    "check": "npm run typecheck && node scripts/build.mjs --check && python3 scripts/validate.py"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "esbuild": "^0.24.2",
+    "typescript": "^5.7.2"
+  }
+}

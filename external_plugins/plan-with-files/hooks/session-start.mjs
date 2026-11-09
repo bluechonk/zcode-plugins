@@ -1,8 +1,8 @@
-// 本文件由 scripts/build.mjs 从 external_plugins/plan-ledger/src/session-start.ts 生成。
+// 本文件由 scripts/build.mjs 从 external_plugins/plan-with-files/src/session-start.ts 生成。
 // 请修改源码并重跑 `npm run build`，不要直接编辑本文件。
 
 
-// external_plugins/plan-ledger/src/lib/hook.ts
+// external_plugins/plan-with-files/src/lib/hook.ts
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
@@ -30,7 +30,7 @@ function emit(hookEventName, inner) {
   process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName, ...inner } }));
 }
 function stateDir() {
-  return process.env["ZCODE_PLUGIN_DATA"] ?? process.env["CLAUDE_PLUGIN_DATA"] ?? join(homedir(), ".zcode", "plan-ledger");
+  return process.env["ZCODE_PLUGIN_DATA"] ?? process.env["CLAUDE_PLUGIN_DATA"] ?? join(homedir(), ".zcode", "plan-with-files");
 }
 function statePath(sessionId, name) {
   const safe = sessionId.replace(/[^A-Za-z0-9_.-]/g, "_") || "default";
@@ -56,10 +56,10 @@ function envFlag(name) {
   return process.env[name] === "1";
 }
 function disabled() {
-  return envFlag("PLAN_LEDGER_DISABLE") || process.env["ZCODE_PLAN_GATE"] === "off";
+  return envFlag("PLAN_WITH_FILES_DISABLE") || process.env["ZCODE_PLAN_GATE"] === "off";
 }
 
-// external_plugins/plan-ledger/src/lib/zcode-db.ts
+// external_plugins/plan-with-files/src/lib/zcode-db.ts
 import { DatabaseSync } from "node:sqlite";
 import { existsSync, readFileSync as readFileSync2, readdirSync } from "node:fs";
 import { homedir as homedir2 } from "node:os";
@@ -145,7 +145,7 @@ function readPlan(cwd, sessionId) {
   }
 }
 
-// external_plugins/plan-ledger/src/session-start.ts
+// external_plugins/plan-with-files/src/session-start.ts
 var FULL_EVERY = 5;
 function short(text, n) {
   const one = text.replace(/\s+/g, " ").trim();
@@ -169,7 +169,7 @@ async function main() {
   const full = turns % FULL_EVERY === 0 || turns === 1;
   writeState(sessionId, "sessionstart", { turns });
   const open = todos.filter((t) => t.status !== "completed");
-  const lines = ["[plan-ledger] \u5F53\u524D\u4EFB\u52A1\u72B6\u6001\uFF08\u81EA\u52A8\u6C47\u603B\uFF0C\u975E\u6307\u4EE4\uFF09\uFF1A", ""];
+  const lines = ["[plan-with-files] \u5F53\u524D\u4EFB\u52A1\u72B6\u6001\uFF08\u81EA\u52A8\u6C47\u603B\uFF0C\u975E\u6307\u4EE4\uFF09\uFF1A", ""];
   if (goal) {
     lines.push(`\u76EE\u6807\uFF1A${goal.status} \xB7 ${short(goal.objective, 80)}`);
   } else {

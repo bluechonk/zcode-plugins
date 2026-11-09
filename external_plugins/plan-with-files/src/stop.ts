@@ -39,7 +39,7 @@ async function main(): Promise<void> {
   if (issues.length === 0) return;
 
   emit("Stop", {
-    additionalContext: ["[plan-ledger] 计划 / 目标 / 待办之间存在不一致：", "", ...issues].join("\n"),
+    additionalContext: ["[plan-with-files] 计划 / 目标 / 待办之间存在不一致：", "", ...issues].join("\n"),
   });
 }
 

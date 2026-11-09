@@ -1,13 +1,13 @@
-// 本文件由 scripts/build.mjs 从 external_plugins/plan-ledger/src/user-prompt-submit.ts 生成。
+// 本文件由 scripts/build.mjs 从 external_plugins/plan-with-files/src/user-prompt-submit.ts 生成。
 // 请修改源码并重跑 `npm run build`，不要直接编辑本文件。
 
 
-// external_plugins/plan-ledger/src/user-prompt-submit.ts
+// external_plugins/plan-with-files/src/user-prompt-submit.ts
 import { DatabaseSync } from "node:sqlite";
 import { homedir as homedir2 } from "node:os";
 import { join as join2 } from "node:path";
 
-// external_plugins/plan-ledger/src/lib/hook.ts
+// external_plugins/plan-with-files/src/lib/hook.ts
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
@@ -39,7 +39,7 @@ function emit(hookEventName, inner) {
   process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName, ...inner } }));
 }
 function stateDir() {
-  return process.env["ZCODE_PLUGIN_DATA"] ?? process.env["CLAUDE_PLUGIN_DATA"] ?? join(homedir(), ".zcode", "plan-ledger");
+  return process.env["ZCODE_PLUGIN_DATA"] ?? process.env["CLAUDE_PLUGIN_DATA"] ?? join(homedir(), ".zcode", "plan-with-files");
 }
 function statePath(sessionId, name) {
   const safe = sessionId.replace(/[^A-Za-z0-9_.-]/g, "_") || "default";
@@ -65,10 +65,10 @@ function envFlag(name) {
   return process.env[name] === "1";
 }
 function disabled() {
-  return envFlag("PLAN_LEDGER_DISABLE") || process.env["ZCODE_PLAN_GATE"] === "off";
+  return envFlag("PLAN_WITH_FILES_DISABLE") || process.env["ZCODE_PLAN_GATE"] === "off";
 }
 
-// external_plugins/plan-ledger/src/user-prompt-submit.ts
+// external_plugins/plan-with-files/src/user-prompt-submit.ts
 var DB_PATH = join2(homedir2(), ".zcode", "cli", "db", "db.sqlite");
 var MAX_PROMPTS_PER_SESSION = 3;
 var MULTI_STEP_LENGTH = 80;
@@ -103,7 +103,7 @@ function looksMultiStep(prompt) {
   return MULTI_STEP_HINTS.test(text);
 }
 var TEMPLATE = [
-  "[plan-ledger] \u8FD9\u770B\u8D77\u6765\u662F\u591A\u6B65\u4EFB\u52A1\u3002\u5EFA\u8BAE\u5148\u7528 TodoWrite \u62C6\u89E3\uFF0C\u4E0D\u9700\u8981\u8FDB\u5165 plan \u6A21\u5F0F\uFF1A",
+  "[plan-with-files] \u8FD9\u770B\u8D77\u6765\u662F\u591A\u6B65\u4EFB\u52A1\u3002\u5EFA\u8BAE\u5148\u7528 TodoWrite \u62C6\u89E3\uFF0C\u4E0D\u9700\u8981\u8FDB\u5165 plan \u6A21\u5F0F\uFF1A",
   "",
   "1. \u6BCF\u9879\u5199\u6E05\u300C\u505A\u4EC0\u4E48 + \u600E\u4E48\u7B97\u5B8C\u6210\u300D\u2014\u2014\u9A8C\u6536\u6807\u51C6\u6BD4\u52A8\u4F5C\u63CF\u8FF0\u66F4\u91CD\u8981",
   "2. \u6309\u4F9D\u8D56\u987A\u5E8F\u6392 position\uFF0C\u88AB\u4F9D\u8D56\u7684\u5728\u524D",
@@ -116,6 +116,15 @@ var TEMPLATE = [
   "",
   "\u5F85\u529E\u4F1A\u5199\u8FDB .zcode/plans/progress-<sessionId>.md\uFF0C\u968F\u65F6\u53EF\u67E5\u5F53\u524D\u8FDB\u5EA6\u3002"
 ].join("\n");
+var CONFLICT_NOTICE = [
+  "[plan-with-files] \u68C0\u6D4B\u5230\u539F\u751F plan \u6A21\u5F0F\u5DF2\u5F00\u542F\uFF0C\u4E0E\u672C\u63D2\u4EF6\u51B2\u7A81\uFF1A",
+  "",
+  "- \u539F\u751F plan \u4F1A\u6CE8\u5165 5 Phase \u63D0\u793A\u8BCD\uFF0C\u4E0E\u672C\u63D2\u4EF6\u7684\u89C4\u5212\u6A21\u677F\u540C\u65F6\u751F\u6548",
+  "- \u5B83\u7684\u8BA1\u5212\u5199\u8FDB .zcode/plans/ \u4E14\u6C38\u4E45\u7D2F\u79EF\uFF0C\u6CA1\u6709\u6E05\u7406\u673A\u5236",
+  "- \u63D0\u4EA4\u8BA1\u5212\u8981\u5BA1\u6279\uFF0C\u6253\u65AD\u6D41\u7A0B",
+  "",
+  "\u5EFA\u8BAE\u5207\u5230 build \u6A21\u5F0F\uFF0C\u7528 TodoWrite \u62C6\u89E3\u4EFB\u52A1\u3002\u672C\u63D2\u4EF6\u7684\u53F0\u8D26\u4F1A\u63A5\u7BA1\u8FDB\u5EA6\u8FFD\u8E2A\u3002"
+].join("\n");
 async function main() {
   if (disabled()) return;
   const input = await readHookInput();
@@ -123,6 +132,11 @@ async function main() {
   if (isSubagent(input)) return;
   const sessionId = input.session_id ?? "";
   if (!sessionId) return;
+  const mode = input.mode ?? input.permission_mode ?? "";
+  if (mode === "plan") {
+    emit("UserPromptSubmit", { additionalContext: CONFLICT_NOTICE });
+    return;
+  }
   const prompt = typeof input.prompt === "string" ? input.prompt : "";
   if (!looksMultiStep(prompt)) return;
   if (hasTodoThisTurn(sessionId)) return;

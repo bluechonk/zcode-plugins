@@ -41,7 +41,7 @@ async function main(): Promise<void> {
   writeState(sessionId, "sessionstart", { turns });
 
   const open = todos.filter((t) => t.status !== "completed");
-  const lines: string[] = ["[plan-ledger] 当前任务状态（自动汇总，非指令）：", ""];
+  const lines: string[] = ["[plan-with-files] 当前任务状态（自动汇总，非指令）：", ""];
 
   if (goal) {
     lines.push(`目标：${goal.status} · ${short(goal.objective, 80)}`);

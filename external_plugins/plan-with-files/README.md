@@ -1,6 +1,6 @@
-# plan-ledger
+# plan-with-files
 
-两件事：**进度台账**、**三方一致性核对**。
+基于文件的规划，替代 ZCode 内置 plan 模式。三件事：**进度台账**、**三方一致性核对**、**拦原生 plan**。
 
 ZCode 自带三层机制，但彼此互不知情：
 
@@ -40,7 +40,7 @@ todo 表 = 状态机
 
 `TodoWrite` 不需要审批，状态可被脚本读取，且已有 `progress-<sessionId>.md` 台账汇总进度。
 
-确需原生 plan 模式时，设 `PLAN_LEDGER_ALLOW_PLAN_MODE=1` 放行。
+确需原生 plan 模式时，设 `PLAN_WITH_FILES_ALLOW_PLAN_MODE=1` 放行。
 
 ### 规划模板
 
@@ -146,8 +146,8 @@ ZCode 侧边栏的「计划」面板用**每份计划的第一个标题**作为�
 
 | 变量 | 默认 | 说明 |
 | --- | --- | --- |
-| `PLAN_LEDGER_DISABLE` | — | 设 `1` 整体关闭 |
-| `PLAN_LEDGER_ALLOW_PLAN_MODE` | — | 设 `1` 放行 `EnterPlanMode`，恢复 ZCode 原生 plan 模式 |
+| `PLAN_WITH_FILES_DISABLE` | — | 设 `1` 整体关闭 |
+| `PLAN_WITH_FILES_ALLOW_PLAN_MODE` | — | 设 `1` 放行 `EnterPlanMode`，恢复 ZCode 原生 plan 模式 |
 | `ZCODE_PLAN_GATE` | — | 设 `off` 整体关闭（插件改名前的兼容开关） |
 
 ## 数据来源

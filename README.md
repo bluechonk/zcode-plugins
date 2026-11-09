@@ -12,7 +12,7 @@ external_plugins/                      社区插件（官方约定的伙伴/社�
     cli/                               零依赖 CLI（search / fetch / doctor）
     commands/                          斜杠命令
     skills/                            技能
-  plan-ledger/                         计划台账
+  plan-with-files/                     文件规划
     src/*.ts                           入口（计划捕获 / 台账 / 摘要 / 一致性）
     src/lib/                           共享代码，被打进各入口
     hooks/*.mjs                        构建产物（不要手改）
@@ -70,14 +70,14 @@ node scripts/validate.mjs
 | 显示名 | 插件名 | 作用 | 前置条件 |
 | --- | --- | --- | --- |
 | DeepSeek 联网搜索 | `deepseek-web-search` | DeepSeek 官方联网搜索与网页抓取 | Node.js >= 18；`DEEPSEEK_API_KEY` |
-| 计划台账 | `plan-ledger` | 进度台账 + `/goal`／计划／待办三方一致性核对 | Node.js >= 22 |
+| 文件规划 | `plan-with-files` | 进度台账 + 三方一致性核对，替代 ZCode 内置 plan 模式 | Node.js >= 22 |
 | 安全审查 | `security-review` | 编辑后即时扫安全模式；每轮收尾用当前模型审本轮 git diff | Node.js >= 22 |
 | 仓库守卫 | `repo-guardian` | 仓库健康检查（CI、.gitattributes、README）+ 本机规则检测 | Node.js >= 22 |
 
 各自的组件、用法与配置见对应插件的 README：
 
 - [external_plugins/deepseek-web-search/README.md](external_plugins/deepseek-web-search/README.md)
-- [external_plugins/plan-ledger/README.md](external_plugins/plan-ledger/README.md)
+- [external_plugins/plan-with-files/README.md](external_plugins/plan-with-files/README.md)
 - [external_plugins/security-review/README.md](external_plugins/security-review/README.md)
 
 

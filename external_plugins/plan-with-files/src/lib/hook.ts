@@ -64,7 +64,7 @@ export function stateDir(): string {
   return (
     process.env["ZCODE_PLUGIN_DATA"] ??
     process.env["CLAUDE_PLUGIN_DATA"] ??
-    join(homedir(), ".zcode", "plan-ledger")
+    join(homedir(), ".zcode", "plan-with-files")
   );
 }
 
@@ -98,5 +98,5 @@ export function envFlag(name: string): boolean {
 }
 
 export function disabled(): boolean {
-  return envFlag("PLAN_LEDGER_DISABLE") || process.env["ZCODE_PLAN_GATE"] === "off";
+  return envFlag("PLAN_WITH_FILES_DISABLE") || process.env["ZCODE_PLAN_GATE"] === "off";
 }

@@ -58,6 +58,35 @@ todo 表 = 状态机
 
 确需原生 plan 模式时，设 `PLAN_WITH_FILES_ALLOW_PLAN_MODE=1` 放行。
 
+### 判定 plan 模式必须看 planEnabled
+
+ZCode 的 `resolveExecutionState`（`Fw`）里，`mode` 的枚举只有 `build` / `edit` / `yolo` / `guarded` / `auto`，**不含 `plan`**：
+
+```js
+function Fw(e, t = { mode: "build", planEnabled: false }) {
+  let n = Oan.safeParse(e.mode);
+  return {
+    mode: n.success ? n.data : t.mode,                    // plan → 退回 build
+    planEnabled: e.planEnabled ?? (e.mode === "plan" ? true : ...),
+  };
+}
+```
+
+所以 `mode === "plan"` 永远为假，真正的开关是独立的 `planEnabled`。hook 入参的 `permission_mode` 来自 `session.config.mode`，同样不含 `plan`。
+
+本插件读库里的权威状态（`session_entry` 表 `runtime/execution_state` 记录的 `planEnabled`），不看入参。曾用 `input.mode === "plan"` 判断，是死代码——实测库里 5 条记录全是 `{"mode":"yolo","planEnabled":false}` 这类，`mode` 从不为 `plan`。
+
+### plan 与 /goal 互斥
+
+ZCode 的 `applyRuntimeExecutionState`（`V9`）有一条硬拦截：
+
+```js
+if (i.planEnabled && !o.planEnabled && (await readSessionTargetForContext())?.status === "active")
+  throw new Error("Plan and Goal cannot be active at the same time.");
+```
+
+`/goal` 侧也有对称的一条。开着 goal 时模型调 `EnterPlanMode` 会直接抛错，失败信息通常不会被转述给用户，表现为「它就是进不了计划模式」。这是 ZCode 比 Claude Code 多出来的一道门槛——两边的 `EnterPlanMode` 提示词是同一份文本。
+
 ### 规划模板
 
 `UserPromptSubmit` 检测到多步任务（提问超过 80 字或含「实现 / 重构 / 迁移 / 排查」等词）且本轮还没有 `TodoWrite` 时，注入一份轻量模板，强调：

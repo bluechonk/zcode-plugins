@@ -150,3 +150,45 @@ export function listPlanFiles(cwd: string): string[] {
     return [];
   }
 }
+
+export interface ExecutionState {
+  mode: string;
+  planEnabled: boolean;
+}
+
+/**
+ * 读会话的权威执行状态（是否处于 plan 模式）。
+ *
+ * 为什么不用 hook 入参的 `permission_mode`：ZCode 的 `resolveExecutionState`
+ * （`Fw`）里，`mode` 的枚举是 build / edit / yolo / guarded / auto，**不含 plan**，
+ * 所以 `mode` 在 plan 模式下会退回 `build`；真正的开关是独立的 `planEnabled`。
+ * 实测库中 `runtime/execution_state` 的取值也只有 `{"mode":"yolo","planEnabled":false}` 这类。
+ * 因此判断「是否在 plan 模式」必须看 `planEnabled`，看 `mode` 永远为假。
+ */
+export function readExecutionState(sessionId: string): ExecutionState | null {
+  return withDb((db) => {
+    const row = db
+      .prepare(
+        `SELECT data FROM session_entry
+         WHERE session_id = ? AND type = 'runtime/execution_state'
+         ORDER BY time_updated DESC LIMIT 1`
+      )
+      .get(sessionId) as Record<string, unknown> | undefined;
+    if (!row) return null;
+    try {
+      const parsed = JSON.parse(String(row["data"] ?? "{}")) as Record<string, unknown>;
+      return {
+        mode: String(parsed["mode"] ?? ""),
+        planEnabled: parsed["planEnabled"] === true,
+      };
+    } catch {
+      // 数据不是合法 JSON：当作无状态，调用方按「不在 plan 模式」处理
+      return null;
+    }
+  }, null);
+}
+
+/** 是否处于原生 plan 模式 */
+export function isPlanModeActive(sessionId: string): boolean {
+  return readExecutionState(sessionId)?.planEnabled === true;
+}

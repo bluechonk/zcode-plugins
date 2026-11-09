@@ -21,7 +21,7 @@
  */
 
 import { disabled, emit, isSubagent, readHookInput, readState, writeState } from "./lib/hook";
-import { extractPhases } from "./lib/zcode-db";
+import { extractPhases, isPlanModeActive } from "./lib/zcode-db";
 
 /**
  * 计划标题是否只有「Context」这类通用词。
@@ -92,8 +92,10 @@ async function main(): Promise<void> {
   if (!sessionId) return;
 
   // 原生 plan 已开启：先提醒一次，再继续原有逻辑（不阻断当前操作）
-  const mode = input.mode ?? input.permission_mode ?? "";
-  if (mode === "plan" && blocksPlanMode()) {
+  //
+  // 判据是库里的 planEnabled，不是入参的 permission_mode：ZCode 的 mode 枚举
+  // 不含 plan，plan 模式下 mode 会退回 build，看 mode 永远命中不了。
+  if (blocksPlanMode() && isPlanModeActive(sessionId)) {
     const state = readState<ConflictState>(sessionId, "conflict", { noticed: false });
     if (!state.noticed) {
       writeState(sessionId, "conflict", { noticed: true });

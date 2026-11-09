@@ -23,6 +23,7 @@ external_plugins/                      社区插件（官方约定的伙伴/社�
 assets/                                条目图标（catalog 的 icon 指向各自 raw 地址）
 scripts/validate.py                    市场与插件清单校验（取自 zai-org/zcode-plugins，Apache-2.0）
 scripts/build.mjs                      插件构建：src/*.ts → hooks/*.mjs
+scripts/sync-local-marketplace.mjs     把仓库同步到本机 ZCode 的 marketplace 副本与插件缓存
 package.json / tsconfig.json           构建管线（devDependencies 仅构建期需要）
 LICENSE
 ```
@@ -40,6 +41,21 @@ npm run check              # typecheck + 漂移检查 + validate.py
 ```
 
 **产物不要手改**，改 `src/` 后重跑构建；CI 会跑 `--check` 挡住漂移。单文件产物而非多文件，是为了避免插件装进 cache 目录后的相对 import 路径问题。
+
+## 本机验证
+
+改完插件想立刻在新会话里验证，不必等合并 PR 与 GitHub 拉取——ZCode 装插件走的是本机 `~/.zcode/cli/plugins` 下的 marketplace 副本与缓存，先把仓库同步过去即可：
+
+```sh
+npm run sync:local                    # 同步并校验（写盘）
+npm run sync:local -- --dry-run      # 只报告差异，不动文件
+npm run sync:local -- --marketplace-only   # 只同步副本，不动缓存
+npm run sync:local -- --prune         # 顺带清掉缓存里的其他版本目录
+```
+
+写盘前会在仓库 `.tmp/` 下备份被覆盖的副本，校验不一致则以非零退出。`installed_plugins.json` 只读不写：它是 ZCode 自己的状态文件，会话启动时会自行刷新，脚本只在版本对不上时提示。
+
+**hook 在会话创建时注册**，同步后仍需重开一个会话才生效。
 
 ## 条目校验
 

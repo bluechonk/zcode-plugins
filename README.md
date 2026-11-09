@@ -13,7 +13,7 @@ external_plugins/                      社区插件（官方约定的伙伴/社�
     commands/                          斜杠命令
     skills/                            技能
   plan-ledger/                         计划台账
-    src/*.ts                           入口（门禁 / 台账 / 摘要 / 一致性）
+    src/*.ts                           入口（计划捕获 / 台账 / 摘要 / 一致性）
     src/lib/                           共享代码，被打进各入口
     hooks/*.mjs                        构建产物（不要手改）
   security-review/                     安全审查
@@ -54,7 +54,7 @@ python3 scripts/validate.py
 | 显示名 | 插件名 | 作用 | 前置条件 |
 | --- | --- | --- | --- |
 | DeepSeek 联网搜索 | `deepseek-web-search` | DeepSeek 官方联网搜索与网页抓取 | Node.js >= 18；`DEEPSEEK_API_KEY` |
-| 计划台账 | `plan-ledger` | 规划门禁 + 进度台账 + `/goal`／计划／待办三方一致性核对 | Node.js >= 22 |
+| 计划台账 | `plan-ledger` | 进度台账 + `/goal`／计划／待办三方一致性核对 | Node.js >= 22 |
 | 安全审查 | `security-review` | 编辑后即时扫安全模式；每轮收尾用当前模型审本轮 git diff | Node.js >= 22 |
 
 各自的组件、用法与配置见对应插件的 README：

@@ -48,12 +48,7 @@ export async function readHookInput(): Promise<HookInput | null> {
   }
 }
 
-/** 当前是否处于 plan 模式。plan 模式下 ZCode 自己就拒绝写工具，门禁必须让路 */
-export function inPlanMode(input: HookInput): boolean {
-  return (input.permission_mode ?? input.mode ?? "") === "plan";
-}
-
-/** 子代理自带任务边界，不套主会话的门禁与台账 */
+/** 子代理自带任务边界，不套主会话的台账与核对 */
 export function isSubagent(input: HookInput): boolean {
   const agent = input.agent_type ?? "";
   return agent !== "" && agent !== "zcode-agent";

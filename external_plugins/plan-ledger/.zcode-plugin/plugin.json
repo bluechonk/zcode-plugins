@@ -1,10 +1,10 @@
 {
   "name": "plan-ledger",
-  "version": "0.1.0",
-  "description": "Plan gate, progress ledger and three-way consistency checks across /goal, plan files and todos.",
+  "version": "0.2.0",
+  "description": "Progress ledger and three-way consistency checks across /goal, plan files and todos.",
   "description_i18n": {
-    "en": "Plan gate, progress ledger and three-way consistency checks across /goal, plan files and todos.",
-    "zh-CN": "规划门禁、进度台账，以及 /goal、计划文件与待办之间的三方一致性核对。"
+    "en": "Progress ledger and three-way consistency checks across /goal, plan files and todos.",
+    "zh-CN": "进度台账，以及 /goal、计划文件与待办之间的三方一致性核对。"
   },
   "author": {
     "name": "bluechonk",

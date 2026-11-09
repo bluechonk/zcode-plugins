@@ -30,6 +30,9 @@ function isSubagent(input) {
   const agent = input.agent_type ?? "";
   return agent !== "" && agent !== "zcode-agent";
 }
+function emit(hookEventName, inner) {
+  process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName, ...inner } }));
+}
 function stateDir() {
   return process.env["ZCODE_PLUGIN_DATA"] ?? process.env["CLAUDE_PLUGIN_DATA"] ?? join(homedir(), ".zcode", "plan-ledger");
 }
@@ -73,6 +76,15 @@ function extractPhases(planText) {
 }
 
 // external_plugins/plan-ledger/src/pre-tool.ts
+var GENERIC_TITLE = /^#{1,3}\s+(context|背景|概述|概要|说明)\s*$/iu;
+function genericTitleOf(plan) {
+  for (const line of plan.split("\n")) {
+    const m = /^(#{1,3})\s+(.+?)\s*$/u.exec(line);
+    if (!m) continue;
+    return GENERIC_TITLE.test(line) ? m[2] : null;
+  }
+  return null;
+}
 async function main() {
   if (disabled()) return;
   const input = await readHookInput();
@@ -88,5 +100,12 @@ async function main() {
     phases: extractPhases(plan),
     bytes: plan.length
   });
+  const generic = genericTitleOf(plan);
+  if (generic) {
+    emit("PreToolUse", {
+      additionalContext: `[plan-ledger] \u8BA1\u5212\u6807\u9898\u300C${generic}\u300D\u592A\u901A\u7528\uFF1AZCode \u4FA7\u8FB9\u680F\u7528\u7B2C\u4E00\u4E2A\u6807\u9898\u4F5C\u4E3A\u8BA1\u5212\u540D\uFF0C\u591A\u6B21\u89C4\u5212\u540E\u4F1A\u5168\u90E8\u663E\u793A\u6210\u300C${generic}\u300D\uFF0C\u770B\u4E0D\u51FA\u6BCF\u4EFD\u8BA1\u5212\u8981\u505A\u4EC0\u4E48\u3002
+\u5EFA\u8BAE\u6539\u6210\u5E26\u4E3B\u9898\u7684\u5199\u6CD5\uFF0C\u4F8B\u5982\u300C## Context\uFF1Arepo-guardian \u63D2\u4EF6\u300D\u3002`
+    });
+  }
 }
 main().then(() => process.exit(0)).catch(() => process.exit(0));

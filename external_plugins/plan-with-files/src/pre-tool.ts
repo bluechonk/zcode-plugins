@@ -20,7 +20,7 @@
  * 规划引导交回原生；本插件专注做原生没有的台账。
  */
 
-import { disabled, emit, isSubagent, readHookInput, writeState } from "./lib/hook";
+import { disabled, emit, isSubagent, readHookInput, readState, writeState } from "./lib/hook";
 import { extractPhases } from "./lib/zcode-db";
 
 /**
@@ -58,6 +58,29 @@ const DENY_PLAN_MODE =
   "一次只留一个 in_progress。待办会自动汇总到 .zcode/plans/progress-<sessionId>.md。" +
   "确需原生 plan 模式时，设 PLAN_WITH_FILES_ALLOW_PLAN_MODE=1。";
 
+/**
+ * 原生 plan 模式已开启时的冲突提示。
+ *
+ * 为什么放在 PreToolUse 而不是 UserPromptSubmit：实测用户按 /plan 后，斜杠命令
+ * 不触发 UserPromptSubmit，冲突提示根本没机会注入，会话就被原生 plan 锁住了。
+ * 而 plan 模式下模型做任何操作都要过 PreToolUse，那里能稳定拿到 mode。
+ *
+ * 每个会话只提示一次：反复刷同样的警告只会吃上下文。
+ */
+const CONFLICT_NOTICE = [
+  "[plan-with-files] 检测到原生 plan 模式已开启，与本插件冲突：",
+  "",
+  "- 原生 plan 会注入 5 Phase 提示词，与本插件的规划模板同时生效",
+  "- 它的计划写进 .zcode/plans/ 且永久累积，没有清理机制",
+  "- 提交计划要审批，打断流程",
+  "",
+  "建议切到 build 模式，用 TodoWrite 拆解任务。本插件的台账会接管进度追踪。",
+].join("\n");
+
+interface ConflictState {
+  noticed: boolean;
+}
+
 async function main(): Promise<void> {
   if (disabled()) return;
 
@@ -67,6 +90,17 @@ async function main(): Promise<void> {
 
   const sessionId = input.session_id ?? "";
   if (!sessionId) return;
+
+  // 原生 plan 已开启：先提醒一次，再继续原有逻辑（不阻断当前操作）
+  const mode = input.mode ?? input.permission_mode ?? "";
+  if (mode === "plan" && blocksPlanMode()) {
+    const state = readState<ConflictState>(sessionId, "conflict", { noticed: false });
+    if (!state.noticed) {
+      writeState(sessionId, "conflict", { noticed: true });
+      emit("PreToolUse", { additionalContext: CONFLICT_NOTICE });
+      return;
+    }
+  }
 
   // 拦原生 plan 模式：让模型改用 TodoWrite 状态机
   if (input.tool_name === "EnterPlanMode") {

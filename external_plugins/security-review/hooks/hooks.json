@@ -1,6 +1,20 @@
 {
-  "description": "security-review：文件写入后做一次正则安全模式检查，命中即注入提示。",
+  "description": "security-review：编辑后即时做正则安全模式检查；每轮收尾时用本机网关的当前模型审查本轮 git diff。",
   "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "process",
+            "command": "node",
+            "args": [
+              "${ZCODE_PLUGIN_ROOT}/hooks/baseline.mjs"
+            ],
+            "timeoutMs": 15000
+          }
+        ]
+      }
+    ],
     "PostToolUse": [
       {
         "matcher": "Edit|Write|MultiEdit",
@@ -9,10 +23,25 @@
             "type": "process",
             "command": "node",
             "args": [
-              "${ZCODE_PLUGIN_ROOT}/hooks/security-review.mjs"
+              "${ZCODE_PLUGIN_ROOT}/hooks/post-tool.mjs"
             ],
             "timeoutMs": 5000,
             "statusMessage": "security-review：检查本次改动…"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "process",
+            "command": "node",
+            "args": [
+              "${ZCODE_PLUGIN_ROOT}/hooks/stop.mjs"
+            ],
+            "timeoutMs": 150000,
+            "statusMessage": "security-review：审查本轮改动…"
           }
         ]
       }

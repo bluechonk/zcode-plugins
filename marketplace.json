@@ -70,11 +70,11 @@
     {
       "name": "security-review",
       "source": "./external_plugins/security-review",
-      "version": "0.1.0",
-      "description": "Pattern-based security warnings on edits: flags hardcoded secrets, SQL/command injection, path traversal and other common classes right after the file is written.",
+      "version": "0.2.0",
+      "description": "Pattern-based security warnings on edits, plus an end-of-turn LLM review of the turn's git diff run against the model ZCode is currently using.",
       "description_i18n": {
-        "en": "Pattern-based security warnings on edits: flags hardcoded secrets, SQL/command injection, path traversal and other common classes right after the file is written.",
-        "zh-CN": "编辑后即时做安全模式检查：硬编码密钥、SQL/命令注入、路径穿越等常见问题在文件写入后立刻提示。"
+        "en": "Pattern-based security warnings on edits, plus an end-of-turn LLM review of the turn's git diff run against the model ZCode is currently using.",
+        "zh-CN": "编辑后即时做安全模式检查；每轮收尾时用 ZCode 当前在跑的模型审查本轮的 git diff。"
       },
       "displayName": "Security Review",
       "displayName_i18n": {

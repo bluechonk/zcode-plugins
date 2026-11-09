@@ -9,8 +9,14 @@ import { disabled, emit, isSubagent, readHookInput } from "./lib/hook";
 import { cwdOf } from "./lib/hook";
 import { findRepoRoot, hasCI, hasGitattributes, readmeChineseRatio } from "./lib/detect";
 
-/** README 中文占比低于此值视为非中文文档 */
-const MIN_CHINESE_RATIO = 0.3;
+/**
+ * README 中文占比低于此值视为非中文文档。
+ *
+ * 阈值取 15% 而非更高：技术 README 天然含大量代码块、命令、路径与英文标识符，
+ * 本仓库自己的 README 中文占比只有 28%——30% 会把正常的双语文档判成违规。
+ * 全英文文档的占比接近 0，15% 足以区分。
+ */
+const MIN_CHINESE_RATIO = 0.15;
 
 async function main(): Promise<void> {
   if (disabled()) return;

@@ -89,7 +89,7 @@ function readmeChineseRatio(root) {
 var EMOJI = new RegExp("\\p{Extended_Pictographic}", "u");
 
 // external_plugins/repo-guardian/src/session-start.ts
-var MIN_CHINESE_RATIO = 0.3;
+var MIN_CHINESE_RATIO = 0.15;
 async function main() {
   if (disabled()) return;
   const input = await readHookInput();

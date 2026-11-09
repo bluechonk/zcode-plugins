@@ -16,10 +16,22 @@ ZCode 自带三层机制，但彼此互不知情：
 
 | 事件 | 做什么 |
 | --- | --- |
-| `PreToolUse` | 仅 `ExitPlanMode` 提交计划时记下阶段标题 |
+| `PreToolUse` | 仅 `ExitPlanMode` 提交计划时记下阶段标题；标题太通用时提示 |
 | `PostToolUse` | `TodoWrite` / `TodoRead` 之后重建台账 |
 | `SessionStart` | 注入三方状态摘要，带节流 |
 | `Stop` | 三方一致性核对，**只提醒不阻塞** |
+
+### 计划标题要带主题
+
+ZCode 侧边栏的「计划」面板用**每份计划的第一个标题**作为显示名，而 plan 模式规范要求正文以 `## Context` 开头。结果是多次规划后，侧边栏全部显示成「Context」，分不清哪份是哪份——而且计划列表会永久累积，没有清理机制。
+
+本插件在捕获计划时检测裸标题（`Context` / `背景` / `概述` / `概要` / `说明`），命中即提示带上主题：
+
+```md
+## Context：repo-guardian 插件
+```
+
+这样侧边栏显示「Context：repo-guardian 插件」，能看出每份计划要做什么。
 
 ### 为什么不做规划门禁
 

@@ -20,8 +20,26 @@
  * 规划引导交回原生；本插件专注做原生没有的台账。
  */
 
-import { disabled, isSubagent, readHookInput, writeState } from "./lib/hook";
+import { disabled, emit, isSubagent, readHookInput, writeState } from "./lib/hook";
 import { extractPhases } from "./lib/zcode-db";
+
+/**
+ * 计划标题是否只有「Context」这类通用词。
+ *
+ * ZCode 的侧边栏「计划」面板显示每份计划的第一个标题。plan 模式规范要求正文
+ * 以 `## Context` 开头，于是每次提交的计划在侧边栏都叫「Context」——多次规划后
+ * 完全分不清哪份是哪份。这里检测裸标题并提示带上主题。
+ */
+const GENERIC_TITLE = /^#{1,3}\s+(context|背景|概述|概要|说明)\s*$/iu;
+
+function genericTitleOf(plan: string): string | null {
+  for (const line of plan.split("\n")) {
+    const m = /^(#{1,3})\s+(.+?)\s*$/u.exec(line);
+    if (!m) continue;
+    return GENERIC_TITLE.test(line) ? (m[2] as string) : null;
+  }
+  return null;
+}
 
 async function main(): Promise<void> {
   if (disabled()) return;
@@ -45,6 +63,17 @@ async function main(): Promise<void> {
     phases: extractPhases(plan),
     bytes: plan.length,
   });
+
+  // 侧边栏用第一个标题当计划名；裸 Context 会让多次规划全显示成「Context」
+  const generic = genericTitleOf(plan);
+  if (generic) {
+    emit("PreToolUse", {
+      additionalContext:
+        `[plan-ledger] 计划标题「${generic}」太通用：ZCode 侧边栏用第一个标题作为计划名，` +
+        `多次规划后会全部显示成「${generic}」，看不出每份计划要做什么。\n` +
+        `建议改成带主题的写法，例如「## Context：repo-guardian 插件」。`,
+    });
+  }
 }
 
 main()

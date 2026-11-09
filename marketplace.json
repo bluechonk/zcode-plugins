@@ -41,18 +41,18 @@
       ]
     },
     {
-      "name": "plan-gate",
-      "source": "./external_plugins/plan-gate",
-      "version": "0.1.1",
-      "description": "Deny state-changing tools until the current turn is planned with TodoWrite, and mirror the todo list to disk.",
+      "name": "plan-ledger",
+      "source": "./external_plugins/plan-ledger",
+      "version": "0.1.0",
+      "description": "Plan gate, progress ledger and three-way consistency checks across /goal, plan files and todos.",
       "description_i18n": {
-        "en": "Deny state-changing tools until the current turn is planned with TodoWrite, and mirror the todo list to disk.",
-        "zh-CN": "本轮未规划时拦截会改状态的工具，并把待办清单镜像到磁盘。"
+        "en": "Plan gate, progress ledger and three-way consistency checks across /goal, plan files and todos.",
+        "zh-CN": "规划门禁、进度台账，以及 /goal、计划文件与待办之间的三方一致性核对。"
       },
-      "displayName": "Plan Gate",
+      "displayName": "Plan Ledger",
       "displayName_i18n": {
-        "en": "Plan Gate",
-        "zh-CN": "规划门禁"
+        "en": "Plan Ledger",
+        "zh-CN": "计划台账"
       },
       "author": {
         "name": "bluechonk",
@@ -64,7 +64,8 @@
         "hooks",
         "todo",
         "planning",
-        "gate"
+        "ledger",
+        "goal"
       ]
     },
     {

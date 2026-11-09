@@ -95,6 +95,34 @@
         "secrets",
         "injection"
       ]
+    },
+    {
+      "name": "repo-guardian",
+      "source": "./external_plugins/repo-guardian",
+      "version": "0.1.0",
+      "description": "Repository health checks and local rule enforcement: CI presence, .gitattributes, README language, forbidden commands, emoji and temp-file placement.",
+      "description_i18n": {
+        "en": "Repository health checks and local rule enforcement: CI presence, .gitattributes, README language, forbidden commands, emoji and temp-file placement.",
+        "zh-CN": "仓库健康检查与本机规则执行：CI 有无、.gitattributes、README 语言、禁用命令、emoji 与临时文件落点。"
+      },
+      "displayName": "Repo Guardian",
+      "displayName_i18n": {
+        "en": "Repo Guardian",
+        "zh-CN": "仓库守卫"
+      },
+      "author": {
+        "name": "bluechonk",
+        "url": "https://github.com/bluechonk"
+      },
+      "category": "utilities",
+      "icon": "https://raw.githubusercontent.com/bluechonk/zcode-plugins/main/assets/repo-guardian/icon.png",
+      "tags": [
+        "hooks",
+        "ci",
+        "git",
+        "repo",
+        "guard"
+      ]
     }
   ]
 }

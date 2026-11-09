@@ -1,0 +1,50 @@
+{
+  "description": "repo-guardian：仓库健康检查与本机规则执行。",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [
+          {
+            "type": "process",
+            "command": "node",
+            "args": [
+              "${ZCODE_PLUGIN_ROOT}/hooks/session-start.mjs"
+            ],
+            "timeoutMs": 5000,
+            "statusMessage": "repo-guardian：检查仓库健康…"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash|Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "process",
+            "command": "node",
+            "args": [
+              "${ZCODE_PLUGIN_ROOT}/hooks/pre-tool.mjs"
+            ],
+            "timeoutMs": 5000
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "process",
+            "command": "node",
+            "args": [
+              "${ZCODE_PLUGIN_ROOT}/hooks/user-prompt-submit.mjs"
+            ],
+            "timeoutMs": 5000
+          }
+        ]
+      }
+    ]
+  }
+}

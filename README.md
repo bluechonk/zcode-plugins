@@ -21,7 +21,7 @@ external_plugins/                      社区插件（官方约定的伙伴/社�
     src/lib/                           共享代码，被打进各入口
     hooks/*.mjs                        构建产物（不要手改）
 assets/                                条目图标（catalog 的 icon 指向各自 raw 地址）
-scripts/validate.py                    市场与插件清单校验（取自 zai-org/zcode-plugins，Apache-2.0）
+scripts/validate.mjs                   市场与插件清单校验（移植自 zai-org/zcode-plugins，Apache-2.0）
 scripts/build.mjs                      插件构建：src/*.ts → hooks/*.mjs
 scripts/sync-local-marketplace.mjs     把仓库同步到本机 ZCode 的 marketplace 副本与插件缓存
 package.json / tsconfig.json           构建管线（devDependencies 仅构建期需要）
@@ -37,7 +37,7 @@ npm install
 npm run build              # 写盘
 npm run build -- --check   # 只比对，产物与源码不一致则非零退出
 npm run typecheck
-npm run check              # typecheck + 漂移检查 + validate.py
+npm run check              # typecheck + 漂移检查 + validate.mjs
 ```
 
 **产物不要手改**，改 `src/` 后重跑构建；CI 会跑 `--check` 挡住漂移。单文件产物而非多文件，是为了避免插件装进 cache 目录后的相对 import 路径问题。
@@ -60,7 +60,7 @@ npm run sync:local -- --prune         # 顺带清掉缓存里的其他版本目�
 ## 条目校验
 
 ```sh
-python3 scripts/validate.py
+node scripts/validate.mjs
 ```
 
 条目字段与目录位置对齐官方约定：`source` 取 `./external_plugins/<name>`，`description_i18n` 同时提供 en 与 zh-CN 且与插件 manifest 完全一致，`category` 取官方允许集合内的值，`icon` 用仓库内资源的 raw HTTPS 地址。第三方来源见 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)。
@@ -72,6 +72,7 @@ python3 scripts/validate.py
 | DeepSeek 联网搜索 | `deepseek-web-search` | DeepSeek 官方联网搜索与网页抓取 | Node.js >= 18；`DEEPSEEK_API_KEY` |
 | 计划台账 | `plan-ledger` | 进度台账 + `/goal`／计划／待办三方一致性核对 | Node.js >= 22 |
 | 安全审查 | `security-review` | 编辑后即时扫安全模式；每轮收尾用当前模型审本轮 git diff | Node.js >= 22 |
+| 仓库守卫 | `repo-guardian` | 仓库健康检查（CI、.gitattributes、README）+ 本机规则检测 | Node.js >= 22 |
 
 各自的组件、用法与配置见对应插件的 README：
 

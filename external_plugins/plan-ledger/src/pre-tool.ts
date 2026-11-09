@@ -1,144 +1,27 @@
 /**
- * PreToolUse：规划门禁 + 捕获计划。
+ * PreToolUse：捕获 ExitPlanMode 提交的计划。
  *
- * 两件事：
- *   1. 本轮（自最近一次用户提问起）没有 TodoWrite 记录时，拦下会改状态的工具
- *   2. ExitPlanMode 提交计划时，记下计划路径与阶段标题，供台账使用
+ * 只做这一件事：plan 模式批准时，把计划正文里的阶段标题记进会话状态，
+ * 供台账的「计划阶段」一栏使用。
  *
- * 必须让路的三种情况（漏掉任何一个都会产生误导）：
- *   - plan 模式：ZCode 自己就拒绝写工具，再拦一次会把「你在 plan 模式」掩盖成「你没规划」
- *   - 子代理：自带任务边界
- *   - 已有 active 目标（/goal）：目标本身就是规划，不该再要求 TodoWrite
+ * 刻意**不做规划门禁**。这里曾有一层「本轮没 TodoWrite 就拦下改状态的工具」，
+ * 已删除，原因三条：
+ *
+ *   1. 判据错。那层用工具名白名单，只认识写死的十几个名字；ZCode 自己的 plan
+ *      模式走权限层 checkPlanMode()，判据是工具元数据（readOnly / destructive /
+ *      needsApproval），新工具自动正确。实测白名单漏掉 25 个工具，
+ *      ReadSessionContext、CronList 与全部 MCP 只读查询都属于纯读，被误拦。
+ *   2. 时机反。模型要先读代码才知道这任务该不该规划，而只读工具被拦，
+ *      等于在摸清需求之前就逼它交计划。
+ *   3. 职责重叠。ZCode 原生已有两层引导：EnterPlanMode 的 7 条触发条件
+ *      （需用户审批），以及 TodoWrite 提醒（10 轮未写且距上次提醒 10 轮，
+ *      措辞明确允许忽略）。插件再拦一次，只是更差的一遍。
+ *
+ * 规划引导交回原生；本插件专注做原生没有的台账。
  */
 
-import { DatabaseSync } from "node:sqlite";
-import { homedir } from "node:os";
-import { join } from "node:path";
-import { disabled, emit, inPlanMode, isSubagent, readHookInput, readState, writeState } from "./lib/hook";
-import { readGoal } from "./lib/zcode-db";
-
-// 允许用 PLAN_LEDGER_DB 指向副本库：便于在不动真库的前提下验证判定逻辑
-const DB_PATH = process.env["PLAN_LEDGER_DB"] ?? join(homedir(), ".zcode", "cli", "db", "db.sqlite");
-
-/** 规划前允许使用的只读 / 研究 / 元工具 */
-const ALWAYS_ALLOW = new Set([
-  "TodoWrite",
-  "TodoRead",
-  "Read",
-  "Grep",
-  "Glob",
-  "Bash",
-  "WebSearch",
-  "WebFetch",
-  "ListModels",
-  "AskUserQuestion",
-  "Skill",
-  "ToolSearch",
-  "TaskOutput",
-  "TaskStop",
-  "SendMessage",
-  "EnterPlanMode",
-  "ExitPlanMode",
-  "DeferredToolCall",
-]);
-
-const NUDGE_AFTER = 25;
-
-const DENY_REASON =
-  "本轮尚未规划：自上次用户提问以来没有 TodoWrite 记录。" +
-  "请先调用 TodoWrite 写下任务拆解（步骤、顺序、验收标准），再执行该工具。" +
-  "规划前可先用只读工具与 Bash 摸现状，但改代码类动作要先有规划。";
-
-/**
- * 规划判定：三条任一成立即算「本轮已规划」。
- *
- * 为什么不只看 part 表里的 TodoWrite：TodoWrite 常经 DeferredToolCall 转发，
- * 而该转发在入参 JSON 解析失败时会把 input 兜底成 {}、工具根本没执行（实测全库
- * 282 条转发零成功）。只认单一证据会让门禁在转发坏掉时永久锁死——模型既规划不了
- * 也写不了文件。所以改认「规划这个事实」，而不是「某一种调用方式」：
- *
- *   A. part 表里有 TodoWrite 记录（直接调用，全库 1677 条）
- *   B. todo 表在本轮之后被写过（转发成功、或任何写入了待办的路径）
- *   C. 本轮之后有 ExitPlanMode（走 plan 模式，计划本身就是规划）
- */
-const PLAN_QUERY = `
-SELECT
-  EXISTS(
-    SELECT 1 FROM part
-    WHERE session_id = :sid
-      AND json_extract(data, '$.tool') IN ('TodoWrite', 'ExitPlanMode')
-      AND time_created >= COALESCE(
-        (SELECT MAX(time_created) FROM message
-         WHERE session_id = :sid AND json_extract(data, '$.semantics.kind') = 'user_prompt'),
-        0)
-  )
-  OR EXISTS(
-    SELECT 1 FROM todo
-    WHERE session_id = :sid
-      AND time_updated >= COALESCE(
-        (SELECT MAX(time_created) FROM message
-         WHERE session_id = :sid AND json_extract(data, '$.semantics.kind') = 'user_prompt'),
-        0)
-  ) AS planned,
-  (
-    SELECT COUNT(*) FROM part
-    WHERE session_id = :sid
-      AND json_extract(data, '$.type') = 'tool'
-      AND time_created > COALESCE(
-        (SELECT MAX(time_created) FROM part
-         WHERE session_id = :sid AND json_extract(data, '$.tool') IN ('TodoWrite', 'ExitPlanMode')),
-        0)
-  ) AS calls_since_todo
-`;
-
-function readPlanState(sessionId: string): { planned: boolean; calls: number } | null {
-  try {
-    const db = new DatabaseSync(DB_PATH, { readOnly: true });
-    try {
-      const row = db.prepare(PLAN_QUERY).get({ sid: sessionId }) as
-        | { planned?: unknown; calls_since_todo?: unknown }
-        | undefined;
-      return {
-        planned: Boolean(row?.planned),
-        calls: Number(row?.calls_since_todo ?? 0),
-      };
-    } finally {
-      db.close();
-    }
-  } catch {
-    return null; // 库读不到：当作已规划，放行
-  }
-}
-
-/**
- * 规划工具本身是否已经坏掉：本轮出现过失败的 DeferredToolCall，且没有任何成功的规划。
- *
- * 用来防死锁——门禁的解锁路径不能依赖一个会失败的工具。
- */
-function plannerBroken(sessionId: string): boolean {
-  try {
-    const db = new DatabaseSync(DB_PATH, { readOnly: true });
-    try {
-      const row = db
-        .prepare(
-          `SELECT COUNT(*) AS c FROM part
-           WHERE session_id = :sid
-             AND json_extract(data, '$.tool') = 'DeferredToolCall'
-             AND json_extract(data, '$.state.status') = 'error'
-             AND time_created >= COALESCE(
-               (SELECT MAX(time_created) FROM message
-                WHERE session_id = :sid AND json_extract(data, '$.semantics.kind') = 'user_prompt'),
-               0)`
-        )
-        .get({ sid: sessionId }) as { c?: number } | undefined;
-      return Number(row?.c ?? 0) > 0;
-    } finally {
-      db.close();
-    }
-  } catch {
-    return false;
-  }
-}
+import { disabled, isSubagent, readHookInput, writeState } from "./lib/hook";
+import { extractPhases } from "./lib/zcode-db";
 
 async function main(): Promise<void> {
   if (disabled()) return;
@@ -148,60 +31,20 @@ async function main(): Promise<void> {
   if (isSubagent(input)) return;
 
   const sessionId = input.session_id ?? "";
-  const tool = input.tool_name ?? "";
   if (!sessionId) return;
+  if (input.tool_name !== "ExitPlanMode") return;
 
-  // 捕获计划：ExitPlanMode 的 plan 参数就是批准后的完整计划
-  if (tool === "ExitPlanMode") {
-    const plan = input.tool_input?.["plan"];
-    if (typeof plan === "string" && plan.trim()) {
-      const phases = plan
-        .split("\n")
-        .map((l) => /^#{2,3}\s+(.+?)\s*$/.exec(l)?.[1])
-        .filter((x): x is string => Boolean(x))
-        .slice(0, 12);
-      writeState(sessionId, "plan", {
-        capturedAt: new Date().toISOString(),
-        phases,
-        bytes: plan.length,
-      });
-    }
-    return;
-  }
+  // ExitPlanMode 的 plan 参数就是批准后的完整计划。
+  // 阶段提取复用 lib 里的同一份实现——曾在这里复制过一份，加了过滤后忘了同步，
+  // 导致捕获到的阶段把 Context / 验证 这类非实施小节也算进去。
+  const plan = input.tool_input?.["plan"];
+  if (typeof plan !== "string" || !plan.trim()) return;
 
-  if (!tool || ALWAYS_ALLOW.has(tool)) return;
-
-  // plan 模式：ZCode 自己会拒绝写工具，这里再拦会把真实原因掩盖掉
-  if (inPlanMode(input)) return;
-
-  // 有 active 目标时目标本身就是规划，不要求 TodoWrite
-  const goal = readGoal(sessionId);
-  if (goal?.status === "active") return;
-
-  const state = readPlanState(sessionId);
-  if (!state) return;
-
-  if (!state.planned) {
-    // 死锁保护：模型已经试过规划但工具本身失败时，放行而不是锁死。
-    // 依据实测——DeferredToolCall 在入参 JSON 解析失败时会把 input 兜底成 {}，
-    // 工具根本没执行（全库 282 条转发零成功）。此时若仍拒绝，模型既规划不了
-    // 也写不了文件，会话彻底卡住。
-    if (plannerBroken(sessionId)) return;
-
-    emit("PreToolUse", {
-      permissionDecision: "deny",
-      permissionDecisionReason: DENY_REASON,
-    });
-    return;
-  }
-
-  if (state.calls >= NUDGE_AFTER) {
-    emit("PreToolUse", {
-      additionalContext:
-        `进度提醒：距上次 TodoWrite 已执行 ${state.calls} 次工具调用，` +
-        "待办清单可能已过时。请用 TodoWrite 更新进度（完成项标 completed，进行中项标 in_progress）。",
-    });
-  }
+  writeState(sessionId, "plan", {
+    capturedAt: new Date().toISOString(),
+    phases: extractPhases(plan),
+    bytes: plan.length,
+  });
 }
 
 main()

@@ -64,7 +64,7 @@ import { DatabaseSync } from "node:sqlite";
 import { existsSync, readFileSync as readFileSync2, readdirSync } from "node:fs";
 import { homedir as homedir2 } from "node:os";
 import { join as join2 } from "node:path";
-var DB_PATH = join2(homedir2(), ".zcode", "cli", "db", "db.sqlite");
+var DB_PATH = process.env["PLAN_WITH_FILES_DB"] ?? join2(homedir2(), ".zcode", "cli", "db", "db.sqlite");
 function withDb(fn, fallback) {
   try {
     const db = new DatabaseSync(DB_PATH, { readOnly: true });
@@ -189,6 +189,15 @@ async function main() {
   }
   if (open.length > 0) {
     lines.push("", "\u672A\u5B8C\u6210\u9879\u4F18\u5148\uFF1B\u5DF2\u5B8C\u6210\u7684\u90E8\u5206\u4E0D\u8981\u91CD\u505A\u3002");
+  }
+  if (turns === 1) {
+    lines.push(
+      "",
+      "\u89C4\u5212\u6587\u4EF6\uFF08\u9879\u76EE\u6839\uFF09\uFF1A",
+      "- task_plan.md\uFF1A\u76EE\u6807 / \u4E0B\u4E00\u6B65 / \u9636\u6BB5\u72B6\u6001\uFF0C\u63D2\u4EF6\u6D3E\u751F\uFF0C\u4E0D\u8981\u624B\u6539",
+      "- progress.md\uFF1A\u6D3B\u52A8\u7EBF\u4E0E\u5F85\u529E\u5FEB\u7167\uFF0C\u63D2\u4EF6\u6D3E\u751F\uFF0C\u4E0D\u8981\u624B\u6539",
+      "- findings.md\uFF1A\u8C03\u7814\u7ED3\u679C\u4E0E\u6280\u672F\u51B3\u7B56\uFF0C\u7531\u4F60\u7EF4\u62A4\u2014\u2014\u8FD9\u662F\u552F\u4E00\u4E0D\u7531\u63D2\u4EF6\u751F\u6210\u7684\u6587\u4EF6\uFF0C\u6570\u636E\u5E93\u91CC\u6CA1\u6709\u8FD9\u4E9B\u4FE1\u606F\uFF0C\u4E0A\u4E0B\u6587\u538B\u7F29\u540E\u5C31\u4E22\u4E86"
+    );
   }
   emit("SessionStart", { additionalContext: lines.join("\n") });
 }

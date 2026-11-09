@@ -68,6 +68,18 @@ import { DatabaseSync } from "node:sqlite";
 import { homedir as homedir2 } from "node:os";
 import { join as join2 } from "node:path";
 var DB_PATH = process.env["PLAN_WITH_FILES_DB"] ?? join2(homedir2(), ".zcode", "cli", "db", "db.sqlite");
+function withDb(fn, fallback) {
+  try {
+    const db = new DatabaseSync(DB_PATH, { readOnly: true });
+    try {
+      return fn(db);
+    } finally {
+      db.close();
+    }
+  } catch {
+    return fallback;
+  }
+}
 var NON_STEP_HEADINGS = /^(context|背景|目标|验证|测试|交付|风险|回滚|备注|附录|summary|verification|delivery)/i;
 function extractPhases(planText) {
   const out = [];
@@ -81,6 +93,28 @@ function extractPhases(planText) {
     if (out.length >= 12) break;
   }
   return out;
+}
+function readExecutionState(sessionId) {
+  return withDb((db) => {
+    const row = db.prepare(
+      `SELECT data FROM session_entry
+         WHERE session_id = ? AND type = 'runtime/execution_state'
+         ORDER BY time_updated DESC LIMIT 1`
+    ).get(sessionId);
+    if (!row) return null;
+    try {
+      const parsed = JSON.parse(String(row["data"] ?? "{}"));
+      return {
+        mode: String(parsed["mode"] ?? ""),
+        planEnabled: parsed["planEnabled"] === true
+      };
+    } catch {
+      return null;
+    }
+  }, null);
+}
+function isPlanModeActive(sessionId) {
+  return readExecutionState(sessionId)?.planEnabled === true;
 }
 
 // external_plugins/plan-with-files/src/pre-tool.ts
@@ -113,8 +147,7 @@ async function main() {
   if (isSubagent(input)) return;
   const sessionId = input.session_id ?? "";
   if (!sessionId) return;
-  const mode = input.mode ?? input.permission_mode ?? "";
-  if (mode === "plan" && blocksPlanMode()) {
+  if (blocksPlanMode() && isPlanModeActive(sessionId)) {
     const state = readState(sessionId, "conflict", { noticed: false });
     if (!state.noticed) {
       writeState(sessionId, "conflict", { noticed: true });

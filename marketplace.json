@@ -43,7 +43,7 @@
     {
       "name": "plan-with-files",
       "source": "./external_plugins/plan-with-files",
-      "version": "0.4.0",
+      "version": "0.4.1",
       "description": "File-based planning for ZCode: progress ledger, three-way consistency checks, and a replacement for the built-in plan mode.",
       "description_i18n": {
         "en": "File-based planning for ZCode: progress ledger, three-way consistency checks, and a replacement for the built-in plan mode.",

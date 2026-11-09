@@ -3,7 +3,8 @@
  *
  * 约定（均经源码或实测确认）：
  *   1. ZCode 只认 hookSpecificOutput 里的字段，放顶层会被非严格 schema 静默丢弃
- *   2. 入参里有 permission_mode，取值 plan|build|edit|yolo|guarded|auto
+ *   2. 入参的 permission_mode 来自 session 的 config.mode，取值 build|edit|yolo|guarded|auto，
+ *      **不含 plan**——plan 模式由独立的 planEnabled 表示，判断时读库，别读这个字段
  *   3. PostToolUse 的 tool_response 不裁剪，另有 tool_result_preview 才是 4000 字符截断版
  *   4. 多个 hook 的 additionalContexts 全部累积，但 stopShouldContinue 是后者覆盖前者
  */

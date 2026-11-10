@@ -9,25 +9,8 @@
  */
 
 import { disabled, emit, isSubagent, readHookInput } from "./lib/hook";
+import { addedText, filePathOf } from "./lib/comments";
 import { containsEmoji, findForbiddenCommand, tempScriptOutsideTmp } from "./lib/detect";
-
-function addedText(tool: string, input: Record<string, unknown>): string {
-  const asString = (v: unknown): string => (typeof v === "string" ? v : "");
-  if (tool === "Write") return asString(input["content"]);
-  if (tool === "Edit") return asString(input["new_string"]);
-  if (tool === "MultiEdit") {
-    const edits = input["edits"];
-    if (!Array.isArray(edits)) return "";
-    return edits
-      .map((e) => (e && typeof e === "object" ? asString((e as Record<string, unknown>)["new_string"]) : ""))
-      .join("\n");
-  }
-  return "";
-}
-
-function filePath(tool: string, input: Record<string, unknown>): string {
-  return typeof input["file_path"] === "string" ? (input["file_path"] as string) : "";
-}
 
 async function main(): Promise<void> {
   if (disabled()) return;
@@ -57,7 +40,7 @@ async function main(): Promise<void> {
   if (tool !== "Write" && tool !== "Edit" && tool !== "MultiEdit") return;
 
   // --- 软规则：只提示 ---
-  const path = filePath(tool, toolInput);
+  const path = filePathOf(toolInput);
   const text = addedText(tool, toolInput);
   const hits: string[] = [];
 

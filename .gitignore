@@ -5,3 +5,7 @@ dist/
 .DS_Store
 # 本地 ZCode 配置与插件台账（会话级产物，不入库）
 .zcode/
+# 会话级规划产物（plan-with-files 落盘，跨会话续用，不入库）
+task_plan.md
+progress.md
+findings.md

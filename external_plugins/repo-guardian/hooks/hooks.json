@@ -1,5 +1,5 @@
 {
-  "description": "repo-guardian：仓库健康检查与本机规则执行。",
+  "description": "repo-guardian：仓库健康检查、本机规则执行与注释规范核对。",
   "hooks": {
     "SessionStart": [
       {
@@ -28,6 +28,22 @@
               "${ZCODE_PLUGIN_ROOT}/hooks/pre-tool.mjs"
             ],
             "timeoutMs": 5000
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "process",
+            "command": "node",
+            "args": [
+              "${ZCODE_PLUGIN_ROOT}/hooks/post-tool.mjs"
+            ],
+            "timeoutMs": 5000,
+            "statusMessage": "repo-guardian：核对注释规范…"
           }
         ]
       }

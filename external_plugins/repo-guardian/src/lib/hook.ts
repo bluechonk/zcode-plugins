@@ -76,11 +76,22 @@ export function readState<T>(sessionId: string, fallback: T): T {
   }
 }
 
+/**
+ * 写状态：按字段合并，而不是整体覆盖。
+ *
+ * 三个 hook 共用一个会话状态文件，各自只关心自己的字段。整体覆盖会互相抹掉——
+ * user-prompt-submit 写 lastPromptedTurn 时会把 post-tool 记的 seen 清空，
+ * 于是同一个提示反复出现。合并写是这里唯一安全的做法。
+ */
 export function writeState(sessionId: string, value: unknown): void {
   try {
+    let current: Record<string, unknown> = {};
+    if (value && typeof value === "object" && !Array.isArray(value)) {
+      current = readState<Record<string, unknown>>(sessionId, {});
+    }
     const p = statePath(sessionId);
     mkdirSync(dirname(p), { recursive: true });
-    writeFileSync(p, JSON.stringify(value), "utf8");
+    writeFileSync(p, JSON.stringify({ ...current, ...(value as object) }), "utf8");
   } catch {
     // 状态落盘失败只影响下次检测，不影响本次
   }

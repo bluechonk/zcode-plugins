@@ -1,8 +1,12 @@
 /**
- * SessionStart：仓库健康检测。
+ * SessionStart：仓库健康检测 + 注释规范卡。
  *
- * 只在会话启动时扫一次，把「机器可判定但模型不会主动去看」的仓库状态摆到台面上：
- * CI 有没有、.gitattributes 有没有、README 是不是中文。三项都干净就完全静默。
+ * 健康检查只在会话启动时扫一次，把「机器可判定但模型不会主动去看」的仓库状态摆到台面上：
+ * CI 有没有、.gitattributes 有没有、README 是不是中文。三项都干净就不注入这一段。
+ *
+ * 规范卡是给「机器判不了」的那部分规则留的位置：能不能写 why、算不算复述代码，
+ * 只能靠模型自觉，PostToolUse 的检测覆盖不到。这几条原本常驻 AGENTS.md，
+ * 现在跟着会话走，命中时还会被 PostToolUse 的具体行号提醒一次。
  */
 
 import { disabled, emit, isSubagent, readHookInput } from "./lib/hook";
@@ -18,6 +22,20 @@ import { findRepoRoot, hasCI, hasGitattributes, readmeChineseRatio } from "./lib
  */
 const MIN_CHINESE_RATIO = 0.15;
 
+/** 注释规范卡：与 PostToolUse 的检测项一一对应，只留机器判不了的部分 */
+const COMMENT_RULES = [
+  "[repo-guardian] 注释规范（这几条机器判不了，靠自觉；改动后会被逐行核对）：",
+  "",
+  "1. 写 why 不写 what：回答「为什么这样写」（取舍、约束），不复述代码做了什么。",
+  "2. 注释随代码改动一起更新，不留过时或误导性注释。",
+  "3. 四类禁写：修订记录、作者署名与审批留痕、注释掉的代码、半吊子翻译与复述。",
+  "   署名与修订历史的唯一事实源是 git blame 与 git log，注释里不重复。",
+  "4. 日期绑在事实上必须写（「实测（2026-10-25）上游排队 290s」），绑在人身上的一律删。",
+  "5. TODO / FIXME 写 `TODO(名字): 描述`，带清理条件，不带修订日期。",
+  "6. 禁用 any 图省事；跨模块契约面的刻意宽松要写明设计理由。",
+  "7. 运行时日志一律英文，面向用户的 CLI 报表与 UI 文案保持中文。",
+].join("\n");
+
 async function main(): Promise<void> {
   if (disabled()) return;
 
@@ -25,55 +43,55 @@ async function main(): Promise<void> {
   if (!input || input.hook_event_name !== "SessionStart") return;
   if (isSubagent(input)) return;
 
+  const lines: string[] = [];
+
   const root = findRepoRoot(cwdOf(input));
-  if (!root) return; // 不在 git 仓库里：没什么可查的
+  if (root) {
+    const health: string[] = [];
 
-  const lines: string[] = ["[repo-guardian] 仓库健康检查结果：", ""];
+    if (!hasCI(root)) {
+      health.push(
+        "缺少 CI：仓库没有 .github/workflows/。建议补一个最小 workflow，至少跑构建与测试。",
+        "",
+        "最小骨架（.github/workflows/ci.yml）：",
+        "```yaml",
+        "name: CI",
+        "on:",
+        "  push:",
+        "    branches: [ main ]",
+        "  pull_request:",
+        "jobs:",
+        "  test:",
+        "    runs-on: ubuntu-latest",
+        "    steps:",
+        "      - uses: actions/checkout@v4",
+        "      - uses: actions/setup-node@v4",
+        "        with:",
+        "          node-version: \"22\"",
+        "      - run: npm ci",
+        "      - run: npm test",
+        "```",
+        ""
+      );
+    }
 
-  if (!hasCI(root)) {
-    lines.push(
-      "缺少 CI：仓库没有 .github/workflows/。建议补一个最小 workflow，至少跑构建与测试。",
-      "",
-      "最小骨架（.github/workflows/ci.yml）：",
-      "```yaml",
-      "name: CI",
-      "on:",
-      "  push:",
-      "    branches: [ main ]",
-      "  pull_request:",
-      "jobs:",
-      "  test:",
-      "    runs-on: ubuntu-latest",
-      "    steps:",
-      "      - uses: actions/checkout@v4",
-      "      - uses: actions/setup-node@v4",
-      "        with:",
-      "          node-version: \"22\"",
-      "      - run: npm ci",
-      "      - run: npm test",
-      "```",
-      ""
-    );
+    if (!hasGitattributes(root)) {
+      health.push("缺少 .gitattributes：按仓库规范必须存在，且至少包含 `* text=auto eol=lf`。", "");
+    }
+
+    const ratio = readmeChineseRatio(root);
+    if (ratio !== null && ratio < MIN_CHINESE_RATIO) {
+      health.push(`README.md 的中文占比仅 ${(ratio * 100).toFixed(0)}%：README 必须是全中文文档。`, "");
+    }
+
+    if (health.length > 0) {
+      lines.push("[repo-guardian] 仓库健康检查结果：", "", ...health);
+      lines.push("以上只是提示，不是阻塞。判断本仓库确实不需要某项时直接说明理由继续。");
+    }
   }
 
-  if (!hasGitattributes(root)) {
-    lines.push(
-      "缺少 .gitattributes：按仓库规范必须存在，且至少包含 `* text=auto eol=lf`。",
-      ""
-    );
-  }
-
-  const ratio = readmeChineseRatio(root);
-  if (ratio !== null && ratio < MIN_CHINESE_RATIO) {
-    lines.push(
-      `README.md 的中文占比仅 ${(ratio * 100).toFixed(0)}%（要求 30%）：README 必须是全中文文档。`,
-      ""
-    );
-  }
-
-  if (lines.length === 2) return; // 三项都干净，保持静默
-
-  lines.push("以上只是提示，不是阻塞。判断本仓库确实不需要某项时直接说明理由继续。");
+  if (lines.length > 0) lines.push("");
+  lines.push(COMMENT_RULES);
 
   emit("SessionStart", { additionalContext: lines.join("\n") });
 }

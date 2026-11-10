@@ -90,54 +90,66 @@ var EMOJI = new RegExp("\\p{Extended_Pictographic}", "u");
 
 // external_plugins/repo-guardian/src/session-start.ts
 var MIN_CHINESE_RATIO = 0.15;
+var COMMENT_RULES = [
+  "[repo-guardian] \u6CE8\u91CA\u89C4\u8303\uFF08\u8FD9\u51E0\u6761\u673A\u5668\u5224\u4E0D\u4E86\uFF0C\u9760\u81EA\u89C9\uFF1B\u6539\u52A8\u540E\u4F1A\u88AB\u9010\u884C\u6838\u5BF9\uFF09\uFF1A",
+  "",
+  "1. \u5199 why \u4E0D\u5199 what\uFF1A\u56DE\u7B54\u300C\u4E3A\u4EC0\u4E48\u8FD9\u6837\u5199\u300D\uFF08\u53D6\u820D\u3001\u7EA6\u675F\uFF09\uFF0C\u4E0D\u590D\u8FF0\u4EE3\u7801\u505A\u4E86\u4EC0\u4E48\u3002",
+  "2. \u6CE8\u91CA\u968F\u4EE3\u7801\u6539\u52A8\u4E00\u8D77\u66F4\u65B0\uFF0C\u4E0D\u7559\u8FC7\u65F6\u6216\u8BEF\u5BFC\u6027\u6CE8\u91CA\u3002",
+  "3. \u56DB\u7C7B\u7981\u5199\uFF1A\u4FEE\u8BA2\u8BB0\u5F55\u3001\u4F5C\u8005\u7F72\u540D\u4E0E\u5BA1\u6279\u7559\u75D5\u3001\u6CE8\u91CA\u6389\u7684\u4EE3\u7801\u3001\u534A\u540A\u5B50\u7FFB\u8BD1\u4E0E\u590D\u8FF0\u3002",
+  "   \u7F72\u540D\u4E0E\u4FEE\u8BA2\u5386\u53F2\u7684\u552F\u4E00\u4E8B\u5B9E\u6E90\u662F git blame \u4E0E git log\uFF0C\u6CE8\u91CA\u91CC\u4E0D\u91CD\u590D\u3002",
+  "4. \u65E5\u671F\u7ED1\u5728\u4E8B\u5B9E\u4E0A\u5FC5\u987B\u5199\uFF08\u300C\u5B9E\u6D4B\uFF082026-10-25\uFF09\u4E0A\u6E38\u6392\u961F 290s\u300D\uFF09\uFF0C\u7ED1\u5728\u4EBA\u8EAB\u4E0A\u7684\u4E00\u5F8B\u5220\u3002",
+  "5. TODO / FIXME \u5199 `TODO(\u540D\u5B57): \u63CF\u8FF0`\uFF0C\u5E26\u6E05\u7406\u6761\u4EF6\uFF0C\u4E0D\u5E26\u4FEE\u8BA2\u65E5\u671F\u3002",
+  "6. \u7981\u7528 any \u56FE\u7701\u4E8B\uFF1B\u8DE8\u6A21\u5757\u5951\u7EA6\u9762\u7684\u523B\u610F\u5BBD\u677E\u8981\u5199\u660E\u8BBE\u8BA1\u7406\u7531\u3002",
+  "7. \u8FD0\u884C\u65F6\u65E5\u5FD7\u4E00\u5F8B\u82F1\u6587\uFF0C\u9762\u5411\u7528\u6237\u7684 CLI \u62A5\u8868\u4E0E UI \u6587\u6848\u4FDD\u6301\u4E2D\u6587\u3002"
+].join("\n");
 async function main() {
   if (disabled()) return;
   const input = await readHookInput();
   if (!input || input.hook_event_name !== "SessionStart") return;
   if (isSubagent(input)) return;
+  const lines = [];
   const root = findRepoRoot(cwdOf(input));
-  if (!root) return;
-  const lines = ["[repo-guardian] \u4ED3\u5E93\u5065\u5EB7\u68C0\u67E5\u7ED3\u679C\uFF1A", ""];
-  if (!hasCI(root)) {
-    lines.push(
-      "\u7F3A\u5C11 CI\uFF1A\u4ED3\u5E93\u6CA1\u6709 .github/workflows/\u3002\u5EFA\u8BAE\u8865\u4E00\u4E2A\u6700\u5C0F workflow\uFF0C\u81F3\u5C11\u8DD1\u6784\u5EFA\u4E0E\u6D4B\u8BD5\u3002",
-      "",
-      "\u6700\u5C0F\u9AA8\u67B6\uFF08.github/workflows/ci.yml\uFF09\uFF1A",
-      "```yaml",
-      "name: CI",
-      "on:",
-      "  push:",
-      "    branches: [ main ]",
-      "  pull_request:",
-      "jobs:",
-      "  test:",
-      "    runs-on: ubuntu-latest",
-      "    steps:",
-      "      - uses: actions/checkout@v4",
-      "      - uses: actions/setup-node@v4",
-      "        with:",
-      '          node-version: "22"',
-      "      - run: npm ci",
-      "      - run: npm test",
-      "```",
-      ""
-    );
+  if (root) {
+    const health = [];
+    if (!hasCI(root)) {
+      health.push(
+        "\u7F3A\u5C11 CI\uFF1A\u4ED3\u5E93\u6CA1\u6709 .github/workflows/\u3002\u5EFA\u8BAE\u8865\u4E00\u4E2A\u6700\u5C0F workflow\uFF0C\u81F3\u5C11\u8DD1\u6784\u5EFA\u4E0E\u6D4B\u8BD5\u3002",
+        "",
+        "\u6700\u5C0F\u9AA8\u67B6\uFF08.github/workflows/ci.yml\uFF09\uFF1A",
+        "```yaml",
+        "name: CI",
+        "on:",
+        "  push:",
+        "    branches: [ main ]",
+        "  pull_request:",
+        "jobs:",
+        "  test:",
+        "    runs-on: ubuntu-latest",
+        "    steps:",
+        "      - uses: actions/checkout@v4",
+        "      - uses: actions/setup-node@v4",
+        "        with:",
+        '          node-version: "22"',
+        "      - run: npm ci",
+        "      - run: npm test",
+        "```",
+        ""
+      );
+    }
+    if (!hasGitattributes(root)) {
+      health.push("\u7F3A\u5C11 .gitattributes\uFF1A\u6309\u4ED3\u5E93\u89C4\u8303\u5FC5\u987B\u5B58\u5728\uFF0C\u4E14\u81F3\u5C11\u5305\u542B `* text=auto eol=lf`\u3002", "");
+    }
+    const ratio = readmeChineseRatio(root);
+    if (ratio !== null && ratio < MIN_CHINESE_RATIO) {
+      health.push(`README.md \u7684\u4E2D\u6587\u5360\u6BD4\u4EC5 ${(ratio * 100).toFixed(0)}%\uFF1AREADME \u5FC5\u987B\u662F\u5168\u4E2D\u6587\u6587\u6863\u3002`, "");
+    }
+    if (health.length > 0) {
+      lines.push("[repo-guardian] \u4ED3\u5E93\u5065\u5EB7\u68C0\u67E5\u7ED3\u679C\uFF1A", "", ...health);
+      lines.push("\u4EE5\u4E0A\u53EA\u662F\u63D0\u793A\uFF0C\u4E0D\u662F\u963B\u585E\u3002\u5224\u65AD\u672C\u4ED3\u5E93\u786E\u5B9E\u4E0D\u9700\u8981\u67D0\u9879\u65F6\u76F4\u63A5\u8BF4\u660E\u7406\u7531\u7EE7\u7EED\u3002");
+    }
   }
-  if (!hasGitattributes(root)) {
-    lines.push(
-      "\u7F3A\u5C11 .gitattributes\uFF1A\u6309\u4ED3\u5E93\u89C4\u8303\u5FC5\u987B\u5B58\u5728\uFF0C\u4E14\u81F3\u5C11\u5305\u542B `* text=auto eol=lf`\u3002",
-      ""
-    );
-  }
-  const ratio = readmeChineseRatio(root);
-  if (ratio !== null && ratio < MIN_CHINESE_RATIO) {
-    lines.push(
-      `README.md \u7684\u4E2D\u6587\u5360\u6BD4\u4EC5 ${(ratio * 100).toFixed(0)}%\uFF08\u8981\u6C42 30%\uFF09\uFF1AREADME \u5FC5\u987B\u662F\u5168\u4E2D\u6587\u6587\u6863\u3002`,
-      ""
-    );
-  }
-  if (lines.length === 2) return;
-  lines.push("\u4EE5\u4E0A\u53EA\u662F\u63D0\u793A\uFF0C\u4E0D\u662F\u963B\u585E\u3002\u5224\u65AD\u672C\u4ED3\u5E93\u786E\u5B9E\u4E0D\u9700\u8981\u67D0\u9879\u65F6\u76F4\u63A5\u8BF4\u660E\u7406\u7531\u7EE7\u7EED\u3002");
+  if (lines.length > 0) lines.push("");
+  lines.push(COMMENT_RULES);
   emit("SessionStart", { additionalContext: lines.join("\n") });
 }
 main().then(() => process.exit(0)).catch(() => process.exit(0));

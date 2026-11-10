@@ -37,13 +37,29 @@ function disabled() {
   return envFlag("REPO_GUARDIAN_DISABLE");
 }
 
+// external_plugins/repo-guardian/src/lib/comments.ts
+function addedText(tool, input) {
+  const asString = (v) => typeof v === "string" ? v : "";
+  if (tool === "Write") return asString(input["content"]);
+  if (tool === "Edit") return asString(input["new_string"]);
+  if (tool === "MultiEdit") {
+    const edits = input["edits"];
+    if (!Array.isArray(edits)) return "";
+    return edits.map((e) => e && typeof e === "object" ? asString(e["new_string"]) : "").join("\n");
+  }
+  return "";
+}
+function filePathOf(input) {
+  return typeof input["file_path"] === "string" ? input["file_path"] : "";
+}
+
 // external_plugins/repo-guardian/src/lib/detect.ts
 var EMOJI = new RegExp("\\p{Extended_Pictographic}", "u");
 function containsEmoji(text) {
   return EMOJI.test(text);
 }
-function tempScriptOutsideTmp(filePath2) {
-  const normalized = filePath2.replace(/\\/gu, "/");
+function tempScriptOutsideTmp(filePath) {
+  const normalized = filePath.replace(/\\/gu, "/");
   if (normalized.startsWith(".tmp/") || normalized.includes("/.tmp/")) return false;
   return /\.ps1$/iu.test(normalized);
 }
@@ -83,20 +99,6 @@ function findForbiddenCommand(command) {
 }
 
 // external_plugins/repo-guardian/src/pre-tool.ts
-function addedText(tool, input) {
-  const asString = (v) => typeof v === "string" ? v : "";
-  if (tool === "Write") return asString(input["content"]);
-  if (tool === "Edit") return asString(input["new_string"]);
-  if (tool === "MultiEdit") {
-    const edits = input["edits"];
-    if (!Array.isArray(edits)) return "";
-    return edits.map((e) => e && typeof e === "object" ? asString(e["new_string"]) : "").join("\n");
-  }
-  return "";
-}
-function filePath(tool, input) {
-  return typeof input["file_path"] === "string" ? input["file_path"] : "";
-}
 async function main() {
   if (disabled()) return;
   const input = await readHookInput();
@@ -118,7 +120,7 @@ async function main() {
     return;
   }
   if (tool !== "Write" && tool !== "Edit" && tool !== "MultiEdit") return;
-  const path = filePath(tool, toolInput);
+  const path = filePathOf(toolInput);
   const text = addedText(tool, toolInput);
   const hits = [];
   if (text && containsEmoji(text)) {

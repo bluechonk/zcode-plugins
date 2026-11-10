@@ -50,9 +50,13 @@ function readState(sessionId, fallback) {
 }
 function writeState(sessionId, value) {
   try {
+    let current = {};
+    if (value && typeof value === "object" && !Array.isArray(value)) {
+      current = readState(sessionId, {});
+    }
     const p = statePath(sessionId);
     mkdirSync(dirname(p), { recursive: true });
-    writeFileSync(p, JSON.stringify(value), "utf8");
+    writeFileSync(p, JSON.stringify({ ...current, ...value }), "utf8");
   } catch {
   }
 }

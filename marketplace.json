@@ -99,11 +99,11 @@
     {
       "name": "repo-guardian",
       "source": "./external_plugins/repo-guardian",
-      "version": "0.1.0",
-      "description": "Repository health checks and local rule enforcement: CI presence, .gitattributes, README language, forbidden commands, emoji and temp-file placement.",
+      "version": "0.2.0",
+      "description": "Repository health checks and local rule enforcement: CI presence, .gitattributes, README language, forbidden commands, emoji and temp-file placement, plus comment-rule lint after every write.",
       "description_i18n": {
-        "en": "Repository health checks and local rule enforcement: CI presence, .gitattributes, README language, forbidden commands, emoji and temp-file placement.",
-        "zh-CN": "仓库健康检查与本机规则执行：CI 有无、.gitattributes、README 语言、禁用命令、emoji 与临时文件落点。"
+        "en": "Repository health checks and local rule enforcement: CI presence, .gitattributes, README language, forbidden commands, emoji and temp-file placement, plus comment-rule lint after every write.",
+        "zh-CN": "仓库健康检查与本机规则执行：CI 有无、.gitattributes、README 语言、禁用命令、emoji 与临时文件落点，以及写入后的注释规范核对。"
       },
       "displayName": "Repo Guardian",
       "displayName_i18n": {

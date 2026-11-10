@@ -99,7 +99,7 @@
     {
       "name": "repo-guardian",
       "source": "./external_plugins/repo-guardian",
-      "version": "0.2.0",
+      "version": "0.2.1",
       "description": "Repository health checks and local rule enforcement: CI presence, .gitattributes, README language, forbidden commands, emoji and temp-file placement, plus comment-rule lint after every write.",
       "description_i18n": {
         "en": "Repository health checks and local rule enforcement: CI presence, .gitattributes, README language, forbidden commands, emoji and temp-file placement, plus comment-rule lint after every write.",

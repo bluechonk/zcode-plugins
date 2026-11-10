@@ -6,12 +6,16 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+
+// external_plugins/security-review/src/lib/rules.ts
 var RULES = [
   {
     id: "hardcoded-secret",
     what: "\u7591\u4F3C\u628A\u5BC6\u94A5/\u53E3\u4EE4\u5199\u6210\u5B57\u9762\u91CF",
     fix: "\u6539\u4ECE\u73AF\u5883\u53D8\u91CF\u6216\u5BC6\u94A5\u7BA1\u7406\u8BFB\u53D6\uFF0C\u4E0D\u8981\u5165\u5E93",
-    pattern: /\b(api[_-]?key|secret|token|password|passwd|credential)\b\s*[:=]\s*["'`][^"'`\s]{12,}["'`]/i
+    // 前瞻排掉含 `${` 的模板插值：`${prefix}${token}` 这类是算出来的值，
+    // 长度与字符集都符合「像字面量」，但它跟硬编码无关。
+    pattern: /\b(api[_-]?key|secret|token|password|passwd|credential)\b\s*[:=]\s*["'`](?![^"'`\s]*\$\{)[^"'`\s]{12,}["'`]/i
   },
   {
     id: "aws-access-key",
@@ -29,9 +33,15 @@ var RULES = [
     id: "sql-concat",
     what: "SQL \u8BED\u53E5\u7528\u5B57\u7B26\u4E32\u62FC\u63A5\u6784\u9020",
     fix: "\u6539\u7528\u53C2\u6570\u5316\u67E5\u8BE2\uFF08\u5360\u4F4D\u7B26 + \u7ED1\u5B9A\u53C2\u6570\uFF09",
-    // 中段允许引号：真实写法是 `"... WHERE id = " + userId`，闭合引号在 + 之前，
-    // 若把引号排除出字符类就永远匹配不到
-    pattern: /\b(SELECT|INSERT\s+INTO|UPDATE|DELETE\s+FROM)\b[^\n;]{0,200}?(\+\s*[A-Za-z_$]|\$\{|%s|\.format\s*\()/i
+    // 拼接的判据是「加号紧邻字符串字面量」，不能只看「加号后面跟标识符」：
+    // 正则字面量里的量词恰好满足后者——`update\s+set` 的 `+s` 就是加号紧跟字母，
+    // 实测把代码里的正则与规则自身的定义都误报了一遍。
+    //
+    // 前面要求 SQL 自己的两段式结构（SELECT…FROM / UPDATE…SET），而不是单个关键字：
+    // 日志文案里的 "before first state update" 只是英文单词，配合同一条消息里的
+    // 模板插值就凑成了命中。单个关键字在自然语言里出现得太频繁。
+    // 负向后顾再挡方法调用：摘要函数的 `.update(...)` 链式调用与 SQL 无关。
+    pattern: /(?<!\.)\b(?:SELECT\b[^\n;]{0,200}?\bFROM\b|INSERT\s+INTO\b|UPDATE\b[^\n;]{0,200}?\bSET\b|DELETE\s+FROM\b)[^\n;]{0,200}?(?:\+\s*["'`]|["'`]\s*\+\s*[A-Za-z_$]|\$\{|%s|\.format\s*\()/i
   },
   {
     id: "command-injection",
@@ -61,7 +71,9 @@ var RULES = [
     id: "xss-html",
     what: "\u628A\u672A\u8F6C\u4E49\u5185\u5BB9\u585E\u8FDB HTML",
     fix: "\u6539\u7528\u6587\u672C\u8282\u70B9\uFF0C\u6216\u5148\u7ECF\u767D\u540D\u5355\u51C0\u5316",
-    pattern: /\.innerHTML\s*=|dangerouslySetInnerHTML/
+    // 要求后面跟赋值或 JSX 属性定界符：真实用法是 `dangerouslySetInnerHTML={{...}}`，
+    // 不加这个约束时规则自身的定义文本（结尾是 `dangerouslySetInnerHTML/`）会匹配自己。
+    pattern: /\.innerHTML\s*=|dangerouslySetInnerHTML\s*[=:{]/
   },
   {
     id: "weak-hash",
@@ -106,6 +118,8 @@ var RULES = [
     pattern: /\byaml\.load\s*\(|\bpickle\.load\b|\bunserialize\s*\(/
   }
 ];
+
+// external_plugins/security-review/src/post-tool.ts
 var MAX_WARNINGS = 5;
 var MAX_SCAN_BYTES = 2e5;
 function readStdin() {

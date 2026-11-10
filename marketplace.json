@@ -71,7 +71,7 @@
     {
       "name": "security-review",
       "source": "./external_plugins/security-review",
-      "version": "0.1.1",
+      "version": "0.1.2",
       "description": "Pattern-based security warnings on edits, plus an end-of-turn LLM review of the turn's git diff run against the model ZCode is currently using.",
       "description_i18n": {
         "en": "Pattern-based security warnings on edits, plus an end-of-turn LLM review of the turn's git diff run against the model ZCode is currently using.",
@@ -99,7 +99,7 @@
     {
       "name": "repo-guardian",
       "source": "./external_plugins/repo-guardian",
-      "version": "0.2.1",
+      "version": "0.1.2",
       "description": "Repository health checks and local rule enforcement: CI presence, .gitattributes, README language, forbidden commands, emoji and temp-file placement, plus comment-rule lint after every write.",
       "description_i18n": {
         "en": "Repository health checks and local rule enforcement: CI presence, .gitattributes, README language, forbidden commands, emoji and temp-file placement, plus comment-rule lint after every write.",

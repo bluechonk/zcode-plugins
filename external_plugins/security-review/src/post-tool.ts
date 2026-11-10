@@ -12,6 +12,8 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
+import { RULES, type Rule } from "./lib/rules";
+
 interface HookInput {
   hook_event_name?: string;
   session_id?: string;
@@ -19,123 +21,6 @@ interface HookInput {
   tool_input?: Record<string, unknown>;
   agent_type?: string;
 }
-
-interface Rule {
-  id: string;
-  /** 一句话说清命中了什么 */
-  what: string;
-  /** 怎么修 */
-  fix: string;
-  pattern: RegExp;
-}
-
-/**
- * 规则集：刻意保持精简。宁缺毋滥——误报会持续吃掉模型上下文，
- * 比漏报更伤，所以每条都要求能在只看到新增文本的情况下判断。
- */
-const RULES: readonly Rule[] = [
-  {
-    id: "hardcoded-secret",
-    what: "疑似把密钥/口令写成字面量",
-    fix: "改从环境变量或密钥管理读取，不要入库",
-    pattern:
-      /\b(api[_-]?key|secret|token|password|passwd|credential)\b\s*[:=]\s*["'`][^"'`\s]{12,}["'`]/i,
-  },
-  {
-    id: "aws-access-key",
-    what: "疑似 AWS Access Key ID",
-    fix: "撤销该密钥并改用临时凭据",
-    pattern: /\bAKIA[0-9A-Z]{16}\b/,
-  },
-  {
-    id: "private-key",
-    what: "私钥内容被写进代码",
-    fix: "私钥走密钥管理服务，绝不能入库",
-    pattern: /-----BEGIN [A-Z ]*PRIVATE KEY-----/,
-  },
-  {
-    id: "sql-concat",
-    what: "SQL 语句用字符串拼接构造",
-    fix: "改用参数化查询（占位符 + 绑定参数）",
-    // 中段允许引号：真实写法是 `"... WHERE id = " + userId`，闭合引号在 + 之前，
-    // 若把引号排除出字符类就永远匹配不到
-    pattern:
-      /\b(SELECT|INSERT\s+INTO|UPDATE|DELETE\s+FROM)\b[^\n;]{0,200}?(\+\s*[A-Za-z_$]|\$\{|%s|\.format\s*\()/i,
-  },
-  {
-    id: "command-injection",
-    what: "shell 命令用拼接/插值构造",
-    fix: "改用数组形式传参（execFile/spawn 的 args），不要过 shell",
-    pattern: /\b(exec|execSync|system|popen)\s*\(\s*[^)]*(\+\s*[A-Za-z_$]|\$\{|f")/,
-  },
-  {
-    id: "path-from-request",
-    what: "文件路径直接取自请求参数",
-    fix: "做白名单或规范化后校验前缀，拒绝 ../ 与绝对路径",
-    pattern:
-      /\b(readFile|writeFile|createReadStream|createWriteStream|sendFile|unlink)\s*\([^)]*\b(req|request|ctx|params|query|body)\b/,
-  },
-  {
-    id: "dynamic-code",
-    what: "动态执行代码",
-    fix: "改成显式分支或解析器，不要 eval / new Function",
-    pattern: /\beval\s*\(|\bnew\s+Function\s*\(/,
-  },
-  {
-    id: "tls-verify-off",
-    what: "关闭了 TLS 证书校验",
-    fix: "改回校验；确需自签证书就把该证书加进信任链",
-    pattern: /rejectUnauthorized\s*:\s*false|NODE_TLS_REJECT_UNAUTHORIZED\s*=\s*["']?0/,
-  },
-  {
-    id: "xss-html",
-    what: "把未转义内容塞进 HTML",
-    fix: "改用文本节点，或先经白名单净化",
-    pattern: /\.innerHTML\s*=|dangerouslySetInnerHTML/,
-  },
-  {
-    id: "weak-hash",
-    what: "口令/签名场景使用了弱哈希",
-    fix: "口令用 bcrypt/scrypt/argon2；完整性校验用 sha256 起步",
-    pattern: /createHash\s*\(\s*["'`](md5|sha1)["'`]/i,
-  },
-  {
-    id: "insecure-random",
-    what: "疑似用 Math.random 生成安全相关值",
-    fix: "改用 crypto.randomUUID / randomBytes",
-    pattern: /\b(secret|token|salt|nonce|session[_-]?id|api[_-]?key)\w*\s*[:=]\s*[^;\n]*Math\.random\s*\(/i,
-  },
-  {
-    id: "cors-wildcard",
-    what: "CORS 允许任意来源",
-    fix: "改为白名单来源，或明确说明为何需要放开",
-    pattern: /(Access-Control-Allow-Origin["'`]?\s*[:,]\s*["'`]\*|origin\s*:\s*["'`]\*["'`])/i,
-  },
-  {
-    id: "jwt-weak-secret",
-    what: "疑似把 JWT 密钥写成字面量",
-    fix: "密钥从环境变量读取，至少 32 字节，不要用示例值",
-    pattern: /\b(jwt[_-]?secret|jwt[_-]?key|JWT_SECRET|JWT_KEY)\b\s*[:=]\s*["'`][A-Za-z0-9_\-.]{8,}["'`]/i,
-  },
-  {
-    id: "hardcoded-iv-salt",
-    what: "疑似硬编码 IV 或盐",
-    fix: "IV 每次随机生成并随密文存储；盐用 crypto.randomBytes 生成",
-    pattern: /\b(iv|salt|nonce)\b\s*[:=]\s*["'`][A-Za-z0-9+/=]{8,}["'`]/i,
-  },
-  {
-    id: "child-process-concat",
-    what: "child_process 用字符串拼接构造命令",
-    fix: "改用 execFile / spawn 的数组参数，避免 shell 注入",
-    pattern: /\bexec\s*\(\s*[`"][^`"]*(?:\$\{|\+|"+)/,
-  },
-  {
-    id: "unsafe-deserialize",
-    what: "不安全的反序列化",
-    fix: "改用 JSON 或带 schema 校验的解析；yaml 用 SafeLoader",
-    pattern: /\byaml\.load\s*\(|\bpickle\.load\b|\bunserialize\s*\(/,
-  },
-];
 
 /** 单次最多提示的条数：再多就该在别处解决，塞满上下文反而没人看 */
 const MAX_WARNINGS = 5;

@@ -8,14 +8,21 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 
 // external_plugins/security-review/src/lib/rules.ts
+var CREDENTIAL_PREFIX = /^(?:sk-|pk-|ghp_|gho_|ghs_|github_pat_|xox[baprs]-|AKIA|ASIA|AIza|ya29\.|eyJ)/u;
+function looksLikeCredential(value) {
+  if (value.includes("${")) return false;
+  if (CREDENTIAL_PREFIX.test(value)) return true;
+  if (value.length >= 20) return true;
+  return value.length >= 16 && /[0-9]/u.test(value) && /[A-Za-z]/u.test(value);
+}
 var RULES = [
   {
     id: "hardcoded-secret",
     what: "\u7591\u4F3C\u628A\u5BC6\u94A5/\u53E3\u4EE4\u5199\u6210\u5B57\u9762\u91CF",
     fix: "\u6539\u4ECE\u73AF\u5883\u53D8\u91CF\u6216\u5BC6\u94A5\u7BA1\u7406\u8BFB\u53D6\uFF0C\u4E0D\u8981\u5165\u5E93",
-    // 前瞻排掉含 `${` 的模板插值：`${prefix}${token}` 这类是算出来的值，
-    // 长度与字符集都符合「像字面量」，但它跟硬编码无关。
-    pattern: /\b(api[_-]?key|secret|token|password|passwd|credential)\b\s*[:=]\s*["'`](?![^"'`\s]*\$\{)[^"'`\s]{12,}["'`]/i
+    // 键名用非捕获组：verify 拿到的是捕获组 1，必须正好是值本身
+    pattern: /\b(?:api[_-]?key|secret|token|password|passwd|credential)\b\s*[:=]\s*["'`]([^"'`\s]{8,})["'`]/i,
+    verify: looksLikeCredential
   },
   {
     id: "aws-access-key",
@@ -31,17 +38,19 @@ var RULES = [
   },
   {
     id: "sql-concat",
-    what: "SQL \u8BED\u53E5\u7528\u5B57\u7B26\u4E32\u62FC\u63A5\u6784\u9020",
+    what: "SQL \u8BED\u53E5\u7528\u62FC\u63A5\u6216\u63D2\u503C\u6784\u9020",
     fix: "\u6539\u7528\u53C2\u6570\u5316\u67E5\u8BE2\uFF08\u5360\u4F4D\u7B26 + \u7ED1\u5B9A\u53C2\u6570\uFF09",
-    // 拼接的判据是「加号紧邻字符串字面量」，不能只看「加号后面跟标识符」：
-    // 正则字面量里的量词恰好满足后者——`update\s+set` 的 `+s` 就是加号紧跟字母，
-    // 实测把代码里的正则与规则自身的定义都误报了一遍。
+    // 判据三条同时成立：字符串内容以 SQL 关键字开头 + 关键字大写 + 后面接了拼接或插值。
     //
-    // 前面要求 SQL 自己的两段式结构（SELECT…FROM / UPDATE…SET），而不是单个关键字：
-    // 日志文案里的 "before first state update" 只是英文单词，配合同一条消息里的
-    // 模板插值就凑成了命中。单个关键字在自然语言里出现得太频繁。
-    // 负向后顾再挡方法调用：摘要函数的 `.update(...)` 链式调用与 SQL 无关。
-    pattern: /(?<!\.)\b(?:SELECT\b[^\n;]{0,200}?\bFROM\b|INSERT\s+INTO\b|UPDATE\b[^\n;]{0,200}?\bSET\b|DELETE\s+FROM\b)[^\n;]{0,200}?(?:\+\s*["'`]|["'`]\s*\+\s*[A-Za-z_$]|\$\{|%s|\.format\s*\()/i
+    // 只认关键字会误报：日志文案里 "before first state update"、正则量词里的 update，
+    // 都是普通词。只认拼接信号也会误报：`%s`、`${` 这些符号在正则与散文里到处都是。
+    //
+    // 要求「以关键字开头」是为了一步排掉「句子里提到 SQL 词」；
+    // 要求「关键字大写」是自然的第二道闸——SQL 在代码里惯用大写，
+    // 而踩过的误报全是小写的普通英文词（日志、文案）。代价是小写 SQL 不报，认了。
+    //
+    // 跨行拼接依然覆盖：首行就同时带关键字与加号。
+    pattern: /["'`]\s*(?:SELECT|INSERT\s+INTO|UPDATE|DELETE)\b[^"'`\n]{0,300}?(?:\$\{|["'`]\s*[+%])/
   },
   {
     id: "command-injection",
@@ -71,15 +80,18 @@ var RULES = [
     id: "xss-html",
     what: "\u628A\u672A\u8F6C\u4E49\u5185\u5BB9\u585E\u8FDB HTML",
     fix: "\u6539\u7528\u6587\u672C\u8282\u70B9\uFF0C\u6216\u5148\u7ECF\u767D\u540D\u5355\u51C0\u5316",
-    // 要求后面跟赋值或 JSX 属性定界符：真实用法是 `dangerouslySetInnerHTML={{...}}`，
-    // 不加这个约束时规则自身的定义文本（结尾是 `dangerouslySetInnerHTML/`）会匹配自己。
+    // 要求后面紧跟赋值号或 JSX 属性定界符（`={{...}}` 那种）；少了这个约束，
+    // 规则自身定义文本里「名称后面紧跟正则结束符」会匹配自己。
     pattern: /\.innerHTML\s*=|dangerouslySetInnerHTML\s*[=:{]/
   },
   {
     id: "weak-hash",
-    what: "\u53E3\u4EE4/\u7B7E\u540D\u573A\u666F\u4F7F\u7528\u4E86\u5F31\u54C8\u5E0C",
+    what: "\u53E3\u4EE4\u573A\u666F\u4F7F\u7528\u4E86\u5F31\u54C8\u5E0C",
     fix: "\u53E3\u4EE4\u7528 bcrypt/scrypt/argon2\uFF1B\u5B8C\u6574\u6027\u6821\u9A8C\u7528 sha256 \u8D77\u6B65",
-    pattern: /createHash\s*\(\s*["'`](md5|sha1)["'`]/i
+    // 只在同行的口令上下文里报。md5 用于对齐上游签名是另一回事：那是协议要求的，
+    // 换成 sha256 会直接导致对方验签失败，报了也只能「说明理由继续」，纯噪音。
+    // 用 80 字符窗口而不是整行：同一行里常有多件事，放宽会把无关的 md5 也带进来。
+    pattern: /(?:password|passwd|pwd|口令|密码)[^\n]{0,80}?createHash\s*\(\s*["'`](?:md5|sha1)["'`]|createHash\s*\(\s*["'`](?:md5|sha1)["'`][^\n]{0,80}?(?:password|passwd|pwd|口令|密码)/i
   },
   {
     id: "insecure-random",
@@ -200,7 +212,9 @@ async function main() {
   const shown = new Set(stats.shown);
   const hits = [];
   for (const rule of RULES) {
-    if (!rule.pattern.test(text)) continue;
+    const m = rule.pattern.exec(text);
+    if (!m) continue;
+    if (rule.verify && !rule.verify(m[1] ?? "")) continue;
     stats.hits[rule.id] = (stats.hits[rule.id] ?? 0) + 1;
     const digest = `${rule.id}@${file}`;
     if (shown.has(digest)) continue;

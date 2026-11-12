@@ -15,6 +15,31 @@ export interface Rule {
   /** 怎么修 */
   fix: string;
   pattern: RegExp;
+  /**
+   * 正则之外的补充判据，拿到的是捕获组 1。
+   *
+   * 所以规则里要判的那个片段必须是第一个捕获组（其余分组写非捕获），
+   * 否则传进来的是别的东西。有些判据是「像不像」的模糊判断（比如值看起来像不像凭据），
+   * 写成正则会变成一坨不可读的交替；拿出来用代码表达，意图和可维护性都好得多。
+   */
+  verify?: (value: string) => boolean;
+}
+
+/** 常见凭据前缀：命中就基本可以确定是密钥，不必再看长度 */
+const CREDENTIAL_PREFIX = /^(?:sk-|pk-|ghp_|gho_|ghs_|github_pat_|xox[baprs]-|AKIA|ASIA|AIza|ya29\.|eyJ)/u;
+
+/**
+ * 值看起来像不像凭据。
+ *
+ * 为什么要这一层：只看「键名 + 引号 + 长字符串」会把测试夹具里的占位值
+ * （`apiKey: "modelmux-local"`）也算进来，那类值改起来毫无意义，只会磨损规则可信度。
+ * 真凭据要么有已知前缀，要么够长、字符集够杂。
+ */
+function looksLikeCredential(value: string): boolean {
+  if (value.includes("${")) return false; // 模板插值：算出来的值，不是字面量
+  if (CREDENTIAL_PREFIX.test(value)) return true;
+  if (value.length >= 20) return true;
+  return value.length >= 16 && /[0-9]/u.test(value) && /[A-Za-z]/u.test(value);
 }
 
 export const RULES: readonly Rule[] = [
@@ -22,10 +47,9 @@ export const RULES: readonly Rule[] = [
     id: "hardcoded-secret",
     what: "疑似把密钥/口令写成字面量",
     fix: "改从环境变量或密钥管理读取，不要入库",
-    // 前瞻排掉含 `${` 的模板插值：`${prefix}${token}` 这类是算出来的值，
-    // 长度与字符集都符合「像字面量」，但它跟硬编码无关。
-    pattern:
-      /\b(api[_-]?key|secret|token|password|passwd|credential)\b\s*[:=]\s*["'`](?![^"'`\s]*\$\{)[^"'`\s]{12,}["'`]/i,
+    // 键名用非捕获组：verify 拿到的是捕获组 1，必须正好是值本身
+    pattern: /\b(?:api[_-]?key|secret|token|password|passwd|credential)\b\s*[:=]\s*["'`]([^"'`\s]{8,})["'`]/i,
+    verify: looksLikeCredential,
   },
   {
     id: "aws-access-key",
@@ -41,18 +65,20 @@ export const RULES: readonly Rule[] = [
   },
   {
     id: "sql-concat",
-    what: "SQL 语句用字符串拼接构造",
+    what: "SQL 语句用拼接或插值构造",
     fix: "改用参数化查询（占位符 + 绑定参数）",
-    // 拼接的判据是「加号紧邻字符串字面量」，不能只看「加号后面跟标识符」：
-    // 正则字面量里的量词恰好满足后者——`update\s+set` 的 `+s` 就是加号紧跟字母，
-    // 实测把代码里的正则与规则自身的定义都误报了一遍。
+    // 判据三条同时成立：字符串内容以 SQL 关键字开头 + 关键字大写 + 后面接了拼接或插值。
     //
-    // 前面要求 SQL 自己的两段式结构（SELECT…FROM / UPDATE…SET），而不是单个关键字：
-    // 日志文案里的 "before first state update" 只是英文单词，配合同一条消息里的
-    // 模板插值就凑成了命中。单个关键字在自然语言里出现得太频繁。
-    // 负向后顾再挡方法调用：摘要函数的 `.update(...)` 链式调用与 SQL 无关。
+    // 只认关键字会误报：日志文案里 "before first state update"、正则量词里的 update，
+    // 都是普通词。只认拼接信号也会误报：`%s`、`${` 这些符号在正则与散文里到处都是。
+    //
+    // 要求「以关键字开头」是为了一步排掉「句子里提到 SQL 词」；
+    // 要求「关键字大写」是自然的第二道闸——SQL 在代码里惯用大写，
+    // 而踩过的误报全是小写的普通英文词（日志、文案）。代价是小写 SQL 不报，认了。
+    //
+    // 跨行拼接依然覆盖：首行就同时带关键字与加号。
     pattern:
-      /(?<!\.)\b(?:SELECT\b[^\n;]{0,200}?\bFROM\b|INSERT\s+INTO\b|UPDATE\b[^\n;]{0,200}?\bSET\b|DELETE\s+FROM\b)[^\n;]{0,200}?(?:\+\s*["'`]|["'`]\s*\+\s*[A-Za-z_$]|\$\{|%s|\.format\s*\()/i,
+      /["'`]\s*(?:SELECT|INSERT\s+INTO|UPDATE|DELETE)\b[^"'`\n]{0,300}?(?:\$\{|["'`]\s*[+%])/,
   },
   {
     id: "command-injection",
@@ -83,15 +109,19 @@ export const RULES: readonly Rule[] = [
     id: "xss-html",
     what: "把未转义内容塞进 HTML",
     fix: "改用文本节点，或先经白名单净化",
-    // 要求后面跟赋值或 JSX 属性定界符：真实用法是 `dangerouslySetInnerHTML={{...}}`，
-    // 不加这个约束时规则自身的定义文本（结尾是 `dangerouslySetInnerHTML/`）会匹配自己。
+    // 要求后面紧跟赋值号或 JSX 属性定界符（`={{...}}` 那种）；少了这个约束，
+    // 规则自身定义文本里「名称后面紧跟正则结束符」会匹配自己。
     pattern: /\.innerHTML\s*=|dangerouslySetInnerHTML\s*[=:{]/,
   },
   {
     id: "weak-hash",
-    what: "口令/签名场景使用了弱哈希",
+    what: "口令场景使用了弱哈希",
     fix: "口令用 bcrypt/scrypt/argon2；完整性校验用 sha256 起步",
-    pattern: /createHash\s*\(\s*["'`](md5|sha1)["'`]/i,
+    // 只在同行的口令上下文里报。md5 用于对齐上游签名是另一回事：那是协议要求的，
+    // 换成 sha256 会直接导致对方验签失败，报了也只能「说明理由继续」，纯噪音。
+    // 用 80 字符窗口而不是整行：同一行里常有多件事，放宽会把无关的 md5 也带进来。
+    pattern:
+      /(?:password|passwd|pwd|口令|密码)[^\n]{0,80}?createHash\s*\(\s*["'`](?:md5|sha1)["'`]|createHash\s*\(\s*["'`](?:md5|sha1)["'`][^\n]{0,80}?(?:password|passwd|pwd|口令|密码)/i,
   },
   {
     id: "insecure-random",

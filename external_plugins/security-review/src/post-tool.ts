@@ -138,7 +138,10 @@ async function main(): Promise<void> {
 
   const hits: Array<{ rule: Rule; digest: string }> = [];
   for (const rule of RULES) {
-    if (!rule.pattern.test(text)) continue;
+    const m = rule.pattern.exec(text);
+    if (!m) continue;
+    // 正则是粗筛，verify 是细判：粗筛过不了就没必要细判
+    if (rule.verify && !rule.verify(m[1] ?? "")) continue;
     // 命中即计数，不论是否已提示过——误报调优要的是全量命中
     stats.hits[rule.id] = (stats.hits[rule.id] ?? 0) + 1;
     const digest = `${rule.id}@${file}`;

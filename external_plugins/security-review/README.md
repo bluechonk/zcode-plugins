@@ -11,20 +11,39 @@
 
 | 规则 | 命中特征 |
 | --- | --- |
-| `hardcoded-secret` | 密钥/口令类变量直接赋字面量 |
+| `hardcoded-secret` | 密钥/口令类变量直接赋**看起来像凭据**的字面量 |
 | `aws-access-key` | `AKIA...` 形态的 Access Key ID |
 | `private-key` | PEM 私钥内容进入代码 |
-| `sql-concat` | SQL 用字符串拼接或插值构造 |
+| `sql-concat` | SQL 字符串**以大写关键字开头**，且后面接了拼接或插值 |
 | `command-injection` | `exec`/`system` 等用拼接或插值构造命令 |
 | `path-from-request` | 文件路径直接取自请求参数 |
 | `dynamic-code` | `eval` / `new Function` |
 | `tls-verify-off` | 关闭 TLS 证书校验 |
 | `xss-html` | `innerHTML` / `dangerouslySetInnerHTML` |
-| `weak-hash` | 口令或签名场景使用 md5/sha1 |
+| `weak-hash` | **口令上下文**里用 md5/sha1 摘要 |
 | `insecure-random` | 安全相关值用 `Math.random` 生成 |
 | `cors-wildcard` | CORS 允许任意来源 |
 
-规则集刻意精简：**误报会持续吃掉模型上下文，比漏报更伤**。规则在 `src/post-tool.ts` 的 `RULES`。
+规则集刻意精简：**误报会持续吃掉模型上下文，比漏报更伤**。规则在 `src/lib/rules.ts`。
+
+## 刻意收窄的三条规则
+
+这三条都因为误报率过高收窄过，各自放弃了什么写在下面 —— 收窄是取舍，不是没做。
+
+**`weak-hash` 只管口令。** 上游签名用 md5 是协议要求的，换 sha256 会直接导致对方验签失败；报了也只能「说明理由继续」，纯噪音。所以只在同一行出现 `password` / `passwd` / `pwd` / 口令 / 密码 时才报。**代价**：用 `input`、`secret` 之类的变量名做口令摘要时不报。
+
+**`sql-concat` 要求关键字大写、且位于字符串开头。** 小写的 `update` / `select` 在日志文案里太常见（实测踩到「before first state update」），词法上无法与 SQL 区分。**代价**：小写 SQL 不报，且字符串不以关键字开头（如 `" WHERE id = " + id` 续行单独出现）不报。
+
+**`hardcoded-secret` 要求值像凭据。** 只看「键名 + 引号 + 长字符串」会把测试夹具里的占位值（`apiKey: "modelmux-local"`）也算进来，那类值改起来毫无意义，只会磨损规则可信度。判据是已知前缀（`sk-` / `ghp_` / `AKIA` 等）、长度 ≥ 20，或长度 ≥ 16 且含数字与字母。**代价**：短口令字面量不报。
+
+收窄的效果（`.tmp/probe-security-fp.mjs`，按 `git ls-files` 扫全仓）：
+
+| 语料 | 收窄前 | 收窄后 |
+| --- | --- | --- |
+| 本仓库 46 文件 | 4 | 0 |
+| modelmux 361 文件 | 16 | 0 |
+
+另有一类已知误报无法从词法上排除：**在规则文件里讨论规则本身**（注释里引用触发串）会命中规则。写规则注释时避开完整触发串即可。
 
 ## 收尾审查怎么定范围
 

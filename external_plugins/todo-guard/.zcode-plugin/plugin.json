@@ -1,0 +1,22 @@
+{
+  "name": "todo-guard",
+  "version": "0.1.0",
+  "description": "Todo discipline for ZCode: checks that task decomposition and progress updates actually use TodoWrite, and that a list rewrite was preceded by TodoRead. Advisory only, produces no files.",
+  "description_i18n": {
+    "en": "Todo discipline for ZCode: checks that task decomposition and progress updates actually use TodoWrite, and that a list rewrite was preceded by TodoRead. Advisory only, produces no files.",
+    "zh-CN": "待办纪律核对：确保任务拆解与进度更新真的用上了 TodoWrite，且重写清单前先做过 TodoRead。只提示不阻断，不产生任何文件。"
+  },
+  "author": {
+    "name": "bluechonk",
+    "url": "https://github.com/bluechonk"
+  },
+  "repository": "https://github.com/bluechonk/zcode-plugins",
+  "license": "MIT",
+  "keywords": [
+    "hooks",
+    "todo",
+    "discipline",
+    "goal",
+    "progress"
+  ]
+}

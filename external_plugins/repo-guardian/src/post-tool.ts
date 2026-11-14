@@ -1,7 +1,7 @@
 /**
- * PostToolUse：写入后按注释规范扫一遍本次新增的文本。
+ * PostToolUse：写入后按注释规范与代码规范扫一遍本次新增的文本。
  *
- * 为什么放在写完之后而不是拦下写入：注释是风格问题，deny 会逼模型为了过检把内容改坏；
+ * 为什么放在写完之后而不是拦下写入：这些是风格问题，deny 会逼模型为了过检把内容改坏；
  * 写完后提示，它立刻能用 Edit 修。这与 security-review 的分工一致。
  *
  * 同一会话内同一条规则命中的同一个文件只提示一次：修好了还会再写这个文件，
@@ -10,6 +10,7 @@
 
 import { disabled, emit, isSubagent, readHookInput, readState, writeState } from "./lib/hook";
 import { addedText, checkComments, filePathOf } from "./lib/comments";
+import { checkCode } from "./lib/code-rules";
 
 interface State {
   /** 已提示过的「规则 + 文件」组合 */
@@ -34,7 +35,8 @@ async function main(): Promise<void> {
   const text = addedText(tool, toolInput);
   if (!path || !text) return;
 
-  const hits = checkComments(text, path);
+  // 两类规则一起跑，输出合并成一条提示：分两条会让模型收到两段几乎一样的头部
+  const hits = [...checkComments(text, path), ...checkCode(text, path)];
   if (hits.length === 0) return;
 
   const state = readState<State>(sessionId, { seen: [] });
@@ -52,7 +54,7 @@ async function main(): Promise<void> {
 
   emit("PostToolUse", {
     additionalContext:
-      `[repo-guardian] 本次写入有 ${fresh.length} 处注释不符合规范（${path}）：\n` +
+      `[repo-guardian] 本次写入有 ${fresh.length} 处不符合规范（${path}）：\n` +
       `${lines.join("\n")}\n` +
       "这是风格提示，不阻塞。判断规则不适用就直接说明理由继续，不必为了消提示改坏代码。",
   });

@@ -1,0 +1,22 @@
+{
+  "name": "pua-bridge",
+  "version": "0.1.0",
+  "description": "Bridges PUA's Claude Code command hooks into ZCode: session flavor restore, frustration triggers, integrity guard, failure detection, loop state machine, subagent accounting and pre-compact checkpoints.",
+  "description_i18n": {
+    "en": "Bridges PUA's Claude Code command hooks into ZCode: session flavor restore, frustration triggers, integrity guard, failure detection, loop state machine, subagent accounting and pre-compact checkpoints.",
+    "zh-CN": "把 PUA 的 Claude Code 命令钩子接进 ZCode：会话风味恢复、不满触发、完整性守卫、失败检测、loop 状态机、子代理会计与压缩前检查点。"
+  },
+  "author": {
+    "name": "bluechonk",
+    "url": "https://github.com/bluechonk"
+  },
+  "repository": "https://github.com/bluechonk/zcode-plugins",
+  "license": "MIT",
+  "keywords": [
+    "hooks",
+    "pua",
+    "productivity",
+    "bridge",
+    "compat"
+  ]
+}

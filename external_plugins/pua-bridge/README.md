@@ -43,6 +43,17 @@ ZCode 环境（有 ZCODE_PLUGIN_DATA 或 ZCODE_SESSION_ID）→ ~/.pua
 否则（Claude Code）→ ~/.claude/pua
 ```
 
+`setup-pua-loop.sh`（`/pua-loop` 的启动脚本）与 `pua-loop-hook.sh`（Stop 钩子）**必须用同一套路径规则**，否则设了状态、钩子却读不到——两边都按上面的顺序解析。
+
+## `/pua-loop` 的完整链路
+
+| 环节 | 脚本 | 作用 |
+| --- | --- | --- |
+| 启动 | `hooks/pua/setup-pua-loop.sh` | 建 `loop-<cwd-hash>.md`，写入迭代参数与验证命令 |
+| 每轮收尾 | `hooks/pua/pua-loop-hook.sh` | 读状态文件，检测 `<promise>` / `<loop-abort>`，跑 verify，决定继续或结束 |
+
+启动脚本 vendor 自上游 `scripts/setup-pua-loop.sh`。上游把它放在 `scripts/` 下靠 `/pua-loop` 命令调用，本插件一并收进 `hooks/pua/`，便于离线与自包含。
+
 ## 与 Claude Code 的差异
 
 | 项 | Claude Code | ZCode |

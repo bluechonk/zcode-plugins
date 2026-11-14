@@ -67,7 +67,7 @@ function disabled() {
   return envFlag("REPO_GUARDIAN_DISABLE");
 }
 
-// external_plugins/repo-guardian/src/lib/comments.ts
+// external_plugins/repo-guardian/src/lib/scan.ts
 var JS_LIKE = /* @__PURE__ */ new Set([
   "ts",
   "tsx",
@@ -219,6 +219,11 @@ function stripCommentsAndStrings(text, filePath) {
   }
   return chars.join("");
 }
+function lineOf(text, index) {
+  let line = 1;
+  for (let i = 0; i < index; i += 1) if (text[i] === "\n") line += 1;
+  return line;
+}
 function shouldSkipFile(filePath) {
   const p = filePath.replace(/\\/gu, "/");
   if (/(?:^|\/)(?:node_modules|dist|build|out|coverage)\//u.test(p)) return true;
@@ -229,6 +234,12 @@ function shouldSkipFile(filePath) {
   return false;
 }
 var GENERATED_BANNER = /本文件由 scripts\/build\.mjs 从/u;
+function isGeneratedOrSkipped(text, filePath) {
+  if (shouldSkipFile(filePath)) return true;
+  return GENERATED_BANNER.test(text.slice(0, 300));
+}
+
+// external_plugins/repo-guardian/src/lib/comments.ts
 var CJK = /[\u2010-\u2027\u2030-\u205e\u3000-\u303f\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\ufe30-\ufe4f\uff00-\uffef]/u;
 function decodeUnicodeEscapes(text) {
   return text.replace(/\\u([0-9a-fA-F]{4})/gu, (_, hex) => String.fromCharCode(Number.parseInt(hex, 16)));
@@ -271,11 +282,6 @@ function looksNonChinese(body) {
   if (looksLikeCode(t)) return false;
   if (/(?:注释|comment)/iu.test(t) && /(?:TODO|FIXME|deprecated|ts-ignore|署名|修订)/u.test(t)) return false;
   return true;
-}
-function lineOf(text, index) {
-  let line = 1;
-  for (let i = 0; i < index; i += 1) if (text[i] === "\n") line += 1;
-  return line;
 }
 function cleanBody(raw) {
   return raw.replace(/^\s*\*+/u, "").trim();
@@ -384,6 +390,52 @@ function filePathOf(input) {
   return typeof input["file_path"] === "string" ? input["file_path"] : "";
 }
 
+// external_plugins/repo-guardian/src/lib/code-rules.ts
+var MESSAGES2 = {
+  "hardcoded-path": "\u5199\u6B7B\u4E86\u7EDD\u5BF9\u8DEF\u5F84\uFF1A\u6539\u7528\u9879\u76EE\u5C01\u88C5\u7684\u8DEF\u5F84\u5DE5\u5177\uFF08paths.* / app.getPath()\uFF09\u6216\u76F8\u5BF9\u8DEF\u5F84\u62FC\u63A5\u3002"
+};
+var PROTOCOL = /^[A-Za-z][A-Za-z0-9+.-]*:\/\//u;
+var ABSOLUTE_PATH = [
+  // 盘符前面必须是串首、空白、引号或分隔符，且后面紧跟反斜杠或正斜杠
+  { id: "windows-drive", pattern: /(?:^|[\s"'`(=,;])[A-Za-z]:[\\/]/u },
+  // 只有「Desktop 出现在路径位置」才算：User-Agent 里的 `Loomy|Desktop|Electron`
+  // 是产品标识，不是路径，按单词边界匹配会把它误报进来
+  { id: "desktop", pattern: /(?:^|[\s"'`(=,;])Desktop[\\/]/u },
+  { id: "posix-home", pattern: /\/(?:Users|home)\/[A-Za-z]/u },
+  { id: "appdata", pattern: /(?:^|[\s"'`(=,;])AppData[\\/]/u }
+];
+function looksHardcodedPath(body) {
+  const t = body.trim();
+  if (!t) return false;
+  if (PROTOCOL.test(t)) return false;
+  return ABSOLUTE_PATH.some((r) => r.pattern.test(t));
+}
+var PATH_RULE_EXEMPT = /(?:^|\/)(?:test|tests|__tests__|fixtures?|examples?|samples?)\//u;
+var PATH_TOOL_FILE = /(?:^|\/)(?:paths?|path-utils|paths\.config)\.[cm]?[jt]sx?$/u;
+function isPathRuleExempt(filePath) {
+  const p = filePath.replace(/\\/gu, "/");
+  return PATH_RULE_EXEMPT.test(p) || PATH_TOOL_FILE.test(p);
+}
+function checkCode(text, filePath) {
+  if (!text.trim()) return [];
+  if (isGeneratedOrSkipped(text, filePath)) return [];
+  const hits = [];
+  const push = (rule, line) => {
+    const message = MESSAGES2[rule];
+    if (message) hits.push({ rule, line, message });
+  };
+  if (isPathRuleExempt(filePath)) return hits;
+  const { strings } = scan(text, filePath);
+  for (const s of strings) {
+    const body = text.slice(s.start + 1, Math.max(s.start + 1, s.end - 1));
+    if (looksHardcodedPath(body)) {
+      push("hardcoded-path", lineOf(text, s.start));
+      break;
+    }
+  }
+  return hits;
+}
+
 // external_plugins/repo-guardian/src/post-tool.ts
 async function main() {
   if (disabled()) return;
@@ -398,7 +450,7 @@ async function main() {
   const path = filePathOf(toolInput);
   const text = addedText(tool, toolInput);
   if (!path || !text) return;
-  const hits = checkComments(text, path);
+  const hits = [...checkComments(text, path), ...checkCode(text, path)];
   if (hits.length === 0) return;
   const state = readState(sessionId, { seen: [] });
   const seen = new Set(state.seen ?? []);
@@ -408,7 +460,7 @@ async function main() {
   writeState(sessionId, { seen: [...seen] });
   const lines = fresh.sort((a, b) => a.line - b.line).map((h) => `- \u7B2C ${h.line} \u884C\uFF1A${h.message}`);
   emit("PostToolUse", {
-    additionalContext: `[repo-guardian] \u672C\u6B21\u5199\u5165\u6709 ${fresh.length} \u5904\u6CE8\u91CA\u4E0D\u7B26\u5408\u89C4\u8303\uFF08${path}\uFF09\uFF1A
+    additionalContext: `[repo-guardian] \u672C\u6B21\u5199\u5165\u6709 ${fresh.length} \u5904\u4E0D\u7B26\u5408\u89C4\u8303\uFF08${path}\uFF09\uFF1A
 ${lines.join("\n")}
 \u8FD9\u662F\u98CE\u683C\u63D0\u793A\uFF0C\u4E0D\u963B\u585E\u3002\u5224\u65AD\u89C4\u5219\u4E0D\u9002\u7528\u5C31\u76F4\u63A5\u8BF4\u660E\u7406\u7531\u7EE7\u7EED\uFF0C\u4E0D\u5FC5\u4E3A\u4E86\u6D88\u63D0\u793A\u6539\u574F\u4EE3\u7801\u3002`
   });

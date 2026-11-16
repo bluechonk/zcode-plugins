@@ -1,6 +1,6 @@
 {
   "name": "pua-bridge",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Bridges PUA's Claude Code command hooks into ZCode: session flavor restore, frustration triggers, integrity guard, failure detection, loop state machine, subagent accounting and pre-compact checkpoints.",
   "description_i18n": {
     "en": "Bridges PUA's Claude Code command hooks into ZCode: session flavor restore, frustration triggers, integrity guard, failure detection, loop state machine, subagent accounting and pre-compact checkpoints.",

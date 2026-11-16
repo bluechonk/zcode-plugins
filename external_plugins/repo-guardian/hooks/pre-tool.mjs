@@ -97,6 +97,19 @@ function findForbiddenCommand(command) {
   }
   return null;
 }
+var CJK = /[\u3400-\u4dbf\u4e00-\u9fff]/u;
+function bashChineseStdout(command) {
+  if (!CJK.test(command)) return false;
+  if (/iconv/.test(command)) return false;
+  for (const raw of command.split("\n")) {
+    const line = raw.trim();
+    if (!CJK.test(line)) continue;
+    if (!/(?:^|[;&|]\s*|\bthen\s+|\bdo\s+|\{\s*)echo\b|\bprintf\b/iu.test(line)) continue;
+    if (/>\s*\S/u.test(line)) continue;
+    return true;
+  }
+  return false;
+}
 
 // external_plugins/repo-guardian/src/pre-tool.ts
 async function main() {
@@ -116,6 +129,11 @@ async function main() {
         permissionDecisionReason: `[repo-guardian] ${forbidden.message}`
       });
       return;
+    }
+    if (bashChineseStdout(command)) {
+      emit("PreToolUse", {
+        additionalContext: '[repo-guardian] \u7F16\u7801\u63D0\u793A\uFF1A\u8FD9\u6761\u547D\u4EE4\u7528 bash \u5185\u5EFA\uFF08echo / printf\uFF09\u8F93\u51FA\u4E2D\u6587\u3002\nZCode \u6309\u7CFB\u7EDF\u4EE3\u7801\u9875\uFF08\u672C\u673A 936/GBK\uFF09\u89E3\u7801 Bash \u8F93\u51FA\uFF0C\u800C bash \u5185\u5EFA\u8F93\u51FA UTF-8 \u5B57\u8282\u2014\u2014\u4E2D\u6587\u4F1A\u4E71\u7801\u3002\n\u628A\u4E2D\u6587\u8F93\u51FA\u5305\u4E00\u5C42\uFF1A`echo "\u2026" | iconv -f UTF-8 -t GBK`\uFF1B\u6216\u628A\u4E2D\u6587\u4EA4\u7ED9\u5916\u90E8\u7A0B\u5E8F\uFF08curl -w \u7B49\u6309\u4EE3\u7801\u9875\u8F93\u51FA\uFF09\u3002\npwsh \u4E0E\u5916\u90E8\u7A0B\u5E8F\u4E0D\u53D7\u5F71\u54CD\u3002'
+      });
     }
     return;
   }

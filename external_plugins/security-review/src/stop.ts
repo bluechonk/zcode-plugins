@@ -14,6 +14,7 @@
 
 import { disabled, emitStopBlock, envInt, readHookInput, readState, writeState } from "./lib/hook";
 import { captureBaseline, diffSince } from "./lib/git";
+import { readPrefs } from "./lib/prefs";
 import { resolveSessionConfig, reviewDiff, type Finding } from "./lib/review";
 
 const SEVERITY_LABEL: Record<string, string> = {
@@ -49,6 +50,10 @@ async function main(): Promise<void> {
   // 子代理自带任务边界，不套主会话的审查
   const agent = input.agent_type ?? "";
   if (agent && agent !== "zcode-agent") return;
+
+  // 用户用 /security-review-off 关掉时不发请求。基线由 UserPromptSubmit 照常推进，
+  // 所以重新打开后只审「重新打开之后」的改动，不会把关着那段日子的旧账翻出来
+  if (!readPrefs().llmReview) return;
 
   const sessionId = input.session_id ?? "default";
   const base = readState<{ sha?: string; cwd?: string } | null>(sessionId, "baseline", null);

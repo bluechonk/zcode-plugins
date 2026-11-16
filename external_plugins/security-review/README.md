@@ -5,7 +5,7 @@
 1. **模式层**（`PostToolUse`）：文件写入后立刻用正则扫一遍新增内容，命中即提示。
 2. **收尾审查**（`Stop`）：一轮结束时用 **ZCode 当前在跑的模型**审查本轮 git diff，有问题就把模型叫回来处理。
 
-对照 `security-guidance`（Anthropic）：它的模式层在 ZCode 里本来就能跑，但 LLM 审查依赖 `ANTHROPIC_API_KEY` 或 OAuth token，无凭据时整层空转。本插件把审查后端换成本机网关，无需任何凭据。
+对照 `security-guidance`（Anthropic）：它的模式层在 ZCode 里本来就能跑，但 LLM 审查依赖 `ANTHROPIC_API_KEY` 或 OAuth token，无凭据时整层空转。本插件改为复用 ZCode 当前会话那套模型配置，装好 provider 就能跑。
 
 ## 模式层检测什么
 
@@ -72,6 +72,21 @@
 
 **两个字段都读**：部分模型把结论写在 `reasoning_content`、`content` 是空串，只读 `content` 会永远得到「没问题」——这是静默失效，最难发现。
 
+## 开关：两条命令
+
+收尾审查会真实消耗当前会话那个 provider 的额度，想省掉就关掉：
+
+| 命令 | 作用 |
+| --- | --- |
+| `/security-review-on` | 打开收尾模型审查（默认） |
+| `/security-review-off` | 关闭收尾模型审查 |
+
+关掉后**正则模式层照旧生效**（它不花钱，也已收窄到 0 误报）；要连模式层一起停，用 `SECURITY_REVIEW_DISABLE=1`。
+
+命令正文只是提示词，真正落盘的是 `hooks/toggle.mjs`（`on` / `off` / `status`），开关写在插件数据目录的 `prefs.json`。之所以不交给模型直接改文件：命令能不能生效不该取决于模型有没有照做。
+
+关掉时基线照常推进，所以重新打开后只审「重新打开之后」的改动，不会把关着那段日子的旧账翻出来。
+
 ## 终止性保证
 
 审查会阻塞收尾（`decision: "block"`）要求模型处理，写不严就是死循环。三条约束叠起来：
@@ -111,4 +126,4 @@ npm run build -- --check   # 只比对，不一致则非零退出
 
 ## 依赖
 
-Node >= 22（`node:sqlite`）。运行时零依赖，审查走本机网关、不需要任何 API Key。
+Node >= 22（`node:sqlite`）。运行时零依赖；审查复用当前会话那套 provider 配置，不需要额外准备凭据。

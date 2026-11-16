@@ -127,7 +127,7 @@
     {
       "name": "pua-bridge",
       "source": "./external_plugins/pua-bridge",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "description": "Bridges PUA's Claude Code command hooks into ZCode: session flavor restore, frustration triggers, integrity guard, failure detection, loop state machine, subagent accounting and pre-compact checkpoints.",
       "description_i18n": {
         "en": "Bridges PUA's Claude Code command hooks into ZCode: session flavor restore, frustration triggers, integrity guard, failure detection, loop state machine, subagent accounting and pre-compact checkpoints.",
@@ -140,17 +140,22 @@
         "productivity",
         "bridge",
         "compat"
-      ]
+      ],
+      "displayName": "PUA 生产力教练",
+      "displayName_i18n": {
+        "zh-CN": "PUA 生产力教练",
+        "en": "PUA Coaching"
+      }
     },
     {
       "name": "dev-flow",
       "source": "./external_plugins/dev-flow",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "category": "developer-tools",
-      "description": "Exploratory development wrap-up flow: freely accumulate wip commits on a dev branch, then run a triage session to split them into clean topic branches with rewritten commit messages and sequenced pull requests.",
+      "description": "Exploratory development wrap-up flow: accumulate wip commits on a dev branch, then triage them into clean topic branches. Also enforces the dev-branch discipline with three hooks.",
       "description_i18n": {
-        "en": "Exploratory development wrap-up flow: freely accumulate wip commits on a dev branch, then run a triage session to split them into clean topic branches with rewritten commit messages and sequenced pull requests.",
-        "zh-CN": "探索式开发的收口流程：dev 分支上随意积累 wip 提交，定期开整理会把累积提交按主题拆成干净的主题分支并重写提交信息，再按依赖顺序逐个 PR。"
+        "en": "Exploratory development wrap-up flow: accumulate wip commits on a dev branch, then triage them into clean topic branches. Also enforces the dev-branch discipline with three hooks.",
+        "zh-CN": "探索式开发的收口流程：dev 分支上积累 wip 提交，定期拆成干净的主题分支；并用三个 hook 约束「草稿落 dev」。"
       },
       "tags": [
         "skill",
@@ -158,7 +163,12 @@
         "workflow",
         "commit",
         "pull-request"
-      ]
+      ],
+      "displayName": "探索式开发收口流程",
+      "displayName_i18n": {
+        "zh-CN": "探索式开发收口流程",
+        "en": "Dev Flow Wrap-up"
+      }
     }
   ]
 }

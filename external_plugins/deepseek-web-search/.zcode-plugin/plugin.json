@@ -1,10 +1,10 @@
 {
   "name": "deepseek-web-search",
-  "version": "0.1.1",
-  "description": "DeepSeek official web search and page fetch: zero-dependency CLI plus matching commands, skills and MCP servers.",
+  "version": "0.2.0",
+  "description": "DeepSeek 全家桶应用 API：联网搜索、网页抓取、OCR、语音识别、语音合成，零依赖 CLI 加配套 command、skill 与 MCP 服务。",
   "description_i18n": {
-    "en": "DeepSeek official web search and page fetch: zero-dependency CLI plus matching commands, skills and MCP servers.",
-    "zh-CN": "DeepSeek 官方联网搜索与网页抓取：零依赖 CLI，并配套 command、skill 与 MCP 服务。"
+    "en": "DeepSeek application APIs: web search, page fetch, OCR, speech recognition and text to speech, as a zero-dependency CLI plus matching commands, skills and MCP servers.",
+    "zh-CN": "DeepSeek 全家桶应用 API：联网搜索、网页抓取、OCR、语音识别、语音合成，零依赖 CLI，并配套 command、skill 与 MCP 服务。"
   },
   "author": {
     "name": "bluechonk",
@@ -18,6 +18,10 @@
     "web-search",
     "search",
     "fetch",
+    "ocr",
+    "asr",
+    "tts",
+    "speech",
     "mcp",
     "rag"
   ],
@@ -44,6 +48,42 @@
       ],
       "cwd": "${ZCODE_PROJECT_DIR}",
       "timeoutMs": 60000,
+      "env": {
+        "DEEPSEEK_BASE_URL": "${user_config.base_url}"
+      }
+    },
+    "deepseek_ocr": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "${ZCODE_PLUGIN_ROOT}/cli/src/mcp-ocr.mjs"
+      ],
+      "cwd": "${ZCODE_PROJECT_DIR}",
+      "timeoutMs": 300000,
+      "env": {
+        "DEEPSEEK_BASE_URL": "${user_config.base_url}"
+      }
+    },
+    "deepseek_asr": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "${ZCODE_PLUGIN_ROOT}/cli/src/mcp-asr.mjs"
+      ],
+      "cwd": "${ZCODE_PROJECT_DIR}",
+      "timeoutMs": 300000,
+      "env": {
+        "DEEPSEEK_BASE_URL": "${user_config.base_url}"
+      }
+    },
+    "deepseek_tts": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "${ZCODE_PLUGIN_ROOT}/cli/src/mcp-tts.mjs"
+      ],
+      "cwd": "${ZCODE_PROJECT_DIR}",
+      "timeoutMs": 180000,
       "env": {
         "DEEPSEEK_BASE_URL": "${user_config.base_url}"
       }

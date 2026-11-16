@@ -3,7 +3,21 @@
 
 import { createInterface } from "node:readline";
 
-import { ApiError, ConfigError, DEFAULT_VERSION, fetchPage, resolveConfig, search } from "./api.mjs";
+import {
+  ApiError,
+  ConfigError,
+  DEFAULT_VERSION,
+  OCR_PURPOSES,
+  TTS_FORMATS,
+  TTS_VOICES,
+  asr,
+  fetchPage,
+  ocr,
+  readFileInput,
+  resolveConfig,
+  search,
+  tts,
+} from "./api.mjs";
 
 const TOOLS = {
   search: {
@@ -37,6 +51,58 @@ const TOOLS = {
         url: { type: "string", description: "HTTP or HTTPS URL to fetch." },
       },
       required: ["url"],
+    },
+  },
+  ocr: {
+    name: "deepseek_ocr",
+    title: "DeepSeek OCR",
+    description:
+      "Recognize text in a local PDF, Word, PowerPoint or image file with DeepSeek's official OCR API. Returns the recognized text page by page. Charged per recognized page.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        file: { type: "string", description: "Absolute path to the local file to recognize." },
+        purpose: {
+          type: "string",
+          enum: OCR_PURPOSES,
+          description:
+            "text_recognition extracts text directly from image-free Word/PPT and recognizes other files page by page; rich_layout_recognition recognizes every file page by page and keeps layout coordinates. Default text_recognition.",
+        },
+      },
+      required: ["file"],
+    },
+  },
+  asr: {
+    name: "deepseek_asr",
+    title: "DeepSeek Speech Recognition",
+    description:
+      "Transcribe a local audio file (16-bit PCM WAV or Ogg Opus, up to 120 seconds) with DeepSeek's official ASR API. Returns the full transcript.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        file: { type: "string", description: "Absolute path to the local audio file." },
+      },
+      required: ["file"],
+    },
+  },
+  tts: {
+    name: "deepseek_tts",
+    title: "DeepSeek Text to Speech",
+    description:
+      "Synthesize text into speech with DeepSeek's official TTS API and write the audio to a file. Returns the saved path and size. The model cannot play audio, so report the path to the user.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        text: { type: "string", description: "Text to read, at most 10000 billable characters." },
+        out_path: { type: "string", description: "Absolute path to write the audio file to." },
+        voice_id: { type: "string", enum: TTS_VOICES, description: "stella (female, default) or tide (male)." },
+        format: { type: "string", enum: TTS_FORMATS, description: "wav (default) or pcm." },
+        filter_markdown: {
+          type: "boolean",
+          description: "Strip Markdown formatting before reading. Default true.",
+        },
+      },
+      required: ["text", "out_path"],
     },
   },
 };
@@ -87,13 +153,72 @@ async function callTool(kind, args) {
     return toolResult(text, data);
   }
 
-  if (typeof input.url !== "string" || !/^https?:\/\//u.test(input.url)) {
-    return toolError(`${tool.name} requires an "url" starting with http:// or https://.`);
+  if (kind === "fetch") {
+    if (typeof input.url !== "string" || !/^https?:\/\//u.test(input.url)) {
+      return toolError(`${tool.name} requires an "url" starting with http:// or https://.`);
+    }
+    const config = resolveConfig();
+    const data = await fetchPage({ url: input.url }, config);
+    const text = `${data?.title ? `# ${data.title}\n\n` : ""}${data?.content ?? ""}`;
+    return toolResult(text, data);
   }
-  const config = resolveConfig();
-  const data = await fetchPage({ url: input.url }, config);
-  const text = `${data?.title ? `# ${data.title}\n\n` : ""}${data?.content ?? ""}`;
-  return toolResult(text, data);
+
+  if (kind === "ocr") {
+    if (typeof input.file !== "string" || input.file.trim() === "") {
+      return toolError(`${tool.name} requires a "file" path.`);
+    }
+    if (input.purpose !== undefined && !OCR_PURPOSES.includes(input.purpose)) {
+      return toolError(`${tool.name} "purpose" must be one of: ${OCR_PURPOSES.join(", ")}.`);
+    }
+    const config = resolveConfig();
+    const data = await ocr({ file: readFileInput(input.file), purpose: input.purpose }, config);
+    const pages = Array.isArray(data?.pages) ? data.pages : [];
+    const text = pages.length
+      ? pages.map((page) => page.text ?? "").join("\n\n")
+      : "No recognized pages.";
+    return toolResult(text, data);
+  }
+
+  if (kind === "asr") {
+    if (typeof input.file !== "string" || input.file.trim() === "") {
+      return toolError(`${tool.name} requires a "file" path.`);
+    }
+    const config = resolveConfig();
+    const data = await asr({ file: readFileInput(input.file) }, config);
+    return toolResult(data?.text ?? "", data);
+  }
+
+  if (kind === "tts") {
+    if (typeof input.text !== "string" || input.text.trim() === "") {
+      return toolError(`${tool.name} requires a non-empty "text".`);
+    }
+    if (typeof input.out_path !== "string" || input.out_path.trim() === "") {
+      return toolError(`${tool.name} requires an "out_path" to write the audio to.`);
+    }
+    if (input.voice_id !== undefined && !TTS_VOICES.includes(input.voice_id)) {
+      return toolError(`${tool.name} "voice_id" must be one of: ${TTS_VOICES.join(", ")}.`);
+    }
+    if (input.format !== undefined && !TTS_FORMATS.includes(input.format)) {
+      return toolError(`${tool.name} "format" must be one of: ${TTS_FORMATS.join(", ")}.`);
+    }
+    const config = resolveConfig();
+    const data = await tts(
+      {
+        text: input.text,
+        outPath: input.out_path,
+        voiceId: input.voice_id,
+        format: input.format,
+        filterMarkdown: input.filter_markdown,
+      },
+      config,
+    );
+    return toolResult(
+      `Saved ${data.outPath} (${data.bytes} bytes, ${data.format}, voice ${data.voiceId}).`,
+      data,
+    );
+  }
+
+  return toolError(`Unsupported tool kind: ${kind}`);
 }
 
 // 启动一个 MCP stdio 服务；kind 为 "search" 或 "fetch"。

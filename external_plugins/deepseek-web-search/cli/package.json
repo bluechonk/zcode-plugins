@@ -1,7 +1,7 @@
 {
   "name": "deepseek-web-search",
-  "version": "0.1.0",
-  "description": "Zero-dependency CLI (dws) for DeepSeek official web search and page fetch APIs.",
+  "version": "0.2.0",
+  "description": "Zero-dependency CLI (dws) for DeepSeek application APIs: web search, page fetch, OCR, ASR and TTS.",
   "author": {
     "name": "bluechonk",
     "url": "https://github.com/bluechonk"
@@ -24,6 +24,10 @@
     "web-search",
     "search",
     "fetch",
+    "ocr",
+    "asr",
+    "tts",
+    "speech",
     "mcp",
     "cli"
   ]

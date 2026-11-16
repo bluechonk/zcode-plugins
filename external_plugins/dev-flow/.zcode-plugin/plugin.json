@@ -1,0 +1,22 @@
+{
+  "name": "dev-flow",
+  "version": "0.1.0",
+  "description": "Exploratory development wrap-up flow: freely accumulate wip commits on a dev branch, then run a triage session to split them into clean topic branches with rewritten commit messages and sequenced pull requests.",
+  "description_i18n": {
+    "en": "Exploratory development wrap-up flow: freely accumulate wip commits on a dev branch, then run a triage session to split them into clean topic branches with rewritten commit messages and sequenced pull requests.",
+    "zh-CN": "探索式开发的收口流程：dev 分支上随意积累 wip 提交，定期开整理会把累积提交按主题拆成干净的主题分支并重写提交信息，再按依赖顺序逐个 PR。"
+  },
+  "author": {
+    "name": "bluechonk",
+    "url": "https://github.com/bluechonk"
+  },
+  "repository": "https://github.com/bluechonk/zcode-plugins",
+  "license": "MIT",
+  "keywords": [
+    "skill",
+    "git",
+    "workflow",
+    "commit",
+    "pull-request"
+  ]
+}

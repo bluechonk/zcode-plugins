@@ -46,6 +46,8 @@ const COMMENT_RULES = [
   "   用户主目录拼接——这条会被机器核对。",
   "9. 运行时日志一律英文；面向用户的 CLI 报表与 UI 文案保持中文。",
   "   这条机器判不了（两者写法相同），靠自觉。",
+  "10. Bash 内建（echo / printf）输出中文会被按系统代码页（本机 GBK/936）解码而乱码：",
+  "    包一层 `| iconv -f UTF-8 -t GBK`，或把中文交给外部程序。pwsh 与外部程序不受影响。",
 ].join("\n");
 
 async function main(): Promise<void> {

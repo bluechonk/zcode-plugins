@@ -10,7 +10,7 @@
 
 import { disabled, emit, isSubagent, readHookInput } from "./lib/hook";
 import { addedText, filePathOf } from "./lib/comments";
-import { containsEmoji, findForbiddenCommand, tempScriptOutsideTmp } from "./lib/detect";
+import { bashChineseStdout, containsEmoji, findForbiddenCommand, tempScriptOutsideTmp } from "./lib/detect";
 
 async function main(): Promise<void> {
   if (disabled()) return;
@@ -33,6 +33,16 @@ async function main(): Promise<void> {
         permissionDecisionReason: `[repo-guardian] ${forbidden.message}`,
       });
       return;
+    }
+    // 软规则：bash 内建输出中文会被按 GBK 解码（见 lib/detect.ts 的 bashChineseStdout）
+    if (bashChineseStdout(command)) {
+      emit("PreToolUse", {
+        additionalContext:
+          "[repo-guardian] 编码提示：这条命令用 bash 内建（echo / printf）输出中文。\n" +
+          "ZCode 按系统代码页（本机 936/GBK）解码 Bash 输出，而 bash 内建输出 UTF-8 字节——中文会乱码。\n" +
+          "把中文输出包一层：`echo \"…\" | iconv -f UTF-8 -t GBK`；或把中文交给外部程序（curl -w 等按代码页输出）。\n" +
+          "pwsh 与外部程序不受影响。",
+      });
     }
     return; // Bash 不查 emoji——命令里的 emoji 多半是输出内容
   }

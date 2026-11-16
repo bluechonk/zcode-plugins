@@ -114,3 +114,32 @@ export function findForbiddenCommand(command: string): { id: string; message: st
   }
   return null;
 }
+
+const CJK = /[\u3400-\u4dbf\u4e00-\u9fff]/u;
+
+/**
+ * bash 内建（echo / printf）把中文输出到 stdout。
+ *
+ * 为什么单独立一条：ZCode 的 Bash 输出捕获层按系统代码页（本机 936/GBK）解码，
+ * 而 bash 内建输出的是 UTF-8 字节——两者不一致，中文必然乱码（实测：
+ * `echo "停后"` 显示成「鍋滃悗」）。外部程序（curl -w 等）按代码页输出，反而正常。
+ *
+ * 判据刻意收窄，避免变成「见中文就报」：
+ *   - 命令含中文，且某一行是 echo / printf 且没有重定向到文件
+ *     （`echo "中文" > f` 写进文件是 UTF-8，不受影响）
+ *   - 已经出现过 iconv 就不再提示（模型可能已自行处理）
+ *   - pwsh 脚本不在此列：PowerShell 输出中文正常
+ */
+export function bashChineseStdout(command: string): boolean {
+  if (!CJK.test(command)) return false;
+  if (/iconv/.test(command)) return false;
+  for (const raw of command.split("\n")) {
+    const line = raw.trim();
+    if (!CJK.test(line)) continue;
+    if (!/(?:^|[;&|]\s*|\bthen\s+|\bdo\s+|\{\s*)echo\b|\bprintf\b/iu.test(line)) continue;
+    if (/>\s*\S/u.test(line)) continue; // 重定向到文件：中文进文件，不经捕获层解码
+    return true;
+  }
+  return false;
+}
+

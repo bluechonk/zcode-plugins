@@ -19,7 +19,7 @@ description: Turn text into a speech audio file with DeepSeek's official TTS API
 1. PATH 中是否已全局安装：
 
    ```bash
-   command -v dws
+   command -v dwt
    ```
 
 2. 未命中则用本技能目录推导插件根。本文件位于 `<插件根>/skills/deepseek-tts/SKILL.md`，因此：

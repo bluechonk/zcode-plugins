@@ -1,7 +1,7 @@
 {
-  "name": "deepseek-web-search",
+  "name": "deepseek-toolkit",
   "version": "0.2.0",
-  "description": "Zero-dependency CLI (dws) for DeepSeek application APIs: web search, page fetch, OCR, ASR and TTS.",
+  "description": "Zero-dependency CLI (dwt) for DeepSeek application APIs: web search, page fetch, OCR, ASR and TTS.",
   "author": {
     "name": "bluechonk",
     "url": "https://github.com/bluechonk"
@@ -9,7 +9,7 @@
   "license": "MIT",
   "type": "module",
   "bin": {
-    "dws": "./src/index.mjs"
+    "dwt": "./src/index.mjs"
   },
   "engines": {
     "node": ">=18"
@@ -20,7 +20,7 @@
   ],
   "keywords": [
     "deepseek",
-    "dws",
+    "dwt",
     "web-search",
     "search",
     "fetch",

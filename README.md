@@ -7,7 +7,7 @@ bluechonk 的 ZCode 插件市场。仓库根即市场根，`marketplace.json` �
 ```text
 marketplace.json                       市场清单（catalog name: bluechonk-plugins）
 external_plugins/                      社区插件（官方约定的伙伴/社区插件位置）
-  deepseek-web-search/                 DeepSeek 全家桶（搜索 / 抓取 / OCR / ASR / TTS）
+  deepseek-toolkit/                  DeepSeek 全家桶（搜索 / 抓取 / OCR / ASR / TTS）
     .zcode-plugin/plugin.json          插件清单
     cli/                               零依赖 CLI（search / fetch / ocr / asr / tts / doctor）
     commands/                          斜杠命令
@@ -69,14 +69,14 @@ node scripts/validate.mjs
 
 | 显示名 | 插件名 | 作用 | 前置条件 |
 | --- | --- | --- | --- |
-| DeepSeek 全家桶 | `deepseek-web-search` | DeepSeek 官方应用 API：联网搜索、网页抓取、OCR、语音识别、语音合成 | Node.js >= 18；`DEEPSEEK_API_KEY` |
+| DeepSeek 全家桶 | `deepseek-toolkit` | DeepSeek 官方应用 API：联网搜索、网页抓取、OCR、语音识别、语音合成 | Node.js >= 18；`DEEPSEEK_API_KEY` |
 | 文件规划 | `plan-with-files` | 进度台账 + 三方一致性核对，替代 ZCode 内置 plan 模式 | Node.js >= 22 |
 | 安全审查 | `security-review` | 编辑后即时扫安全模式；每轮收尾用当前模型审本轮 git diff | Node.js >= 22 |
 | 仓库守卫 | `repo-guardian` | 仓库健康检查（CI、.gitattributes、README）+ 本机规则检测 | Node.js >= 22 |
 
 各自的组件、用法与配置见对应插件的 README：
 
-- [external_plugins/deepseek-web-search/README.md](external_plugins/deepseek-web-search/README.md)
+- [external_plugins/deepseek-toolkit/README.md](external_plugins/deepseek-toolkit/README.md)
 - [external_plugins/plan-with-files/README.md](external_plugins/plan-with-files/README.md)
 - [external_plugins/security-review/README.md](external_plugins/security-review/README.md)
 

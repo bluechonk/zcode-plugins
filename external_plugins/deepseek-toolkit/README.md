@@ -1,4 +1,4 @@
-# deepseek-web-search
+# deepseek-toolkit
 
 把 DeepSeek 全家桶应用 API 接入 ZCode：联网搜索、网页抓取、OCR、语音识别、语音合成。
 
@@ -39,20 +39,20 @@ API Key 只走环境变量或 `--api-key`，不写进任何配置文件。
 
 ```bash
 git clone https://github.com/bluechonk/zcode-plugins.git
-cd zcode-plugins/external_plugins/deepseek-web-search/cli
-npm link          # package.json 里已声明 bin，链接一次即可全局用 dws
+cd zcode-plugins/external_plugins/deepseek-toolkit/cli
+npm link          # package.json 里已声明 bin，链接一次即可全局用 dwt
 ```
 
 ```bash
-dws search "DeepSeek V4 发布" --count 5
-dws fetch https://api-docs.deepseek.com/zh-cn/guides/search
-dws ocr 合同.pdf --purpose rich_layout_recognition
-dws asr 会议录音.wav
-dws tts "你好，我是 DeepSeek。" --voice stella --out speech.wav
-dws doctor
+dwt search "DeepSeek V4 发布" --count 5
+dwt fetch https://api-docs.deepseek.com/zh-cn/guides/search
+dwt ocr 合同.pdf --purpose rich_layout_recognition
+dwt asr 会议录音.wav
+dwt tts "你好，我是 DeepSeek。" --voice stella --out speech.wav
+dwt doctor
 ```
 
-不想链接就每次用 Node 直接跑，把下文的 `dws` 换成 `node src/index.mjs`。
+不想链接就每次用 Node 直接跑，把下文的 `dwt` 换成 `node src/index.mjs`。
 
 ## 在 ZCode 里使用
 

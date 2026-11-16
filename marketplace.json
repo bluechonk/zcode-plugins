@@ -11,8 +11,8 @@
   },
   "plugins": [
     {
-      "name": "deepseek-web-search",
-      "source": "./external_plugins/deepseek-web-search",
+      "name": "deepseek-toolkit",
+      "source": "./external_plugins/deepseek-toolkit",
       "version": "0.2.0",
       "description": "DeepSeek 全家桶应用 API：联网搜索、网页抓取、OCR、语音识别、语音合成，零依赖 CLI 加配套 command、skill 与 MCP 服务。",
       "description_i18n": {
@@ -29,7 +29,7 @@
         "url": "https://github.com/bluechonk"
       },
       "category": "developer-tools",
-      "icon": "https://raw.githubusercontent.com/bluechonk/zcode-plugins/main/assets/deepseek-web-search/icon.png",
+      "icon": "https://raw.githubusercontent.com/bluechonk/zcode-plugins/main/assets/deepseek-toolkit/icon.png",
       "homepage": "https://api-docs.deepseek.com/zh-cn/guides/search",
       "tags": [
         "deepseek",

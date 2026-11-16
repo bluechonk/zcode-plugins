@@ -20,10 +20,10 @@ import {
 } from "./api.mjs";
 import { formatJson, isFormat, render, renderError } from "./output.mjs";
 
-const HELP = `dws — DeepSeek 全家桶应用 API CLI（搜索 / 抓取 / OCR / 语音识别 / 语音合成）
+const HELP = `dwt — DeepSeek 全家桶应用 API CLI（搜索 / 抓取 / OCR / 语音识别 / 语音合成）
 
 Usage:
-  dws <command> [options]
+  dwt <command> [options]
 
 Commands:
   search <query>        联网搜索（支持 site:, -site:, -term, "phrase", lang:, after:/before:）
@@ -55,11 +55,11 @@ Environment:
   DEEPSEEK_BASE_URL     可选的 API 地址覆盖
 
 Examples:
-  dws search "DeepSeek V4 发布" --count 5
-  dws fetch https://api-docs.deepseek.com/zh-cn/guides/search
-  dws ocr 合同.pdf --purpose rich_layout_recognition
-  dws asr 会议录音.wav
-  dws tts "你好，我是 DeepSeek。" --voice stella --out speech.wav
+  dwt search "DeepSeek V4 发布" --count 5
+  dwt fetch https://api-docs.deepseek.com/zh-cn/guides/search
+  dwt ocr 合同.pdf --purpose rich_layout_recognition
+  dwt asr 会议录音.wav
+  dwt tts "你好，我是 DeepSeek。" --voice stella --out speech.wav
 `;
 
 // 支持 --opt=value 写法；只展开需要取值的已知选项，避免误伤搜索词。
@@ -286,7 +286,7 @@ async function main() {
     options = parseArgs(expandEquals(process.argv.slice(2)));
   } catch (error) {
     process.stderr.write(renderError(error, "text"));
-    process.stderr.write(`\nRun "dws --help" for usage.\n`);
+    process.stderr.write(`\nRun "dwt --help" for usage.\n`);
     process.exitCode = 2;
     return;
   }
@@ -305,7 +305,7 @@ async function main() {
     files = validate(options);
   } catch (error) {
     process.stderr.write(renderError(error, "text"));
-    process.stderr.write(`\nRun "dws --help" for usage.\n`);
+    process.stderr.write(`\nRun "dwt --help" for usage.\n`);
     process.exitCode = 2;
     return;
   }

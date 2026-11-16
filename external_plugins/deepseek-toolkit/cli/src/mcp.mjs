@@ -227,7 +227,7 @@ export function runMcpServer(kind) {
   if (!tool) throw new ConfigError(`Unknown MCP tool kind: ${kind}`);
 
   const readline = createInterface({ input: process.stdin });
-  process.stderr.write(`deepseek-web-search MCP server ready (${tool.name})\n`);
+  process.stderr.write(`deepseek-toolkit MCP server ready (${tool.name})\n`);
 
   readline.on("line", (line) => {
     const trimmed = line.trim();

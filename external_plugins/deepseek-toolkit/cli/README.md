@@ -1,8 +1,8 @@
-# deepseek-web-search CLI
+# deepseek-toolkit CLI
 
 DeepSeek 全家桶应用 API 的命令行工具：联网搜索、网页抓取、OCR、语音识别、语音合成。零依赖，只用 Node 内置模块。
 
-命令名是 `dws`，短，好敲。
+命令名是 `dwt`，短，好敲。
 
 ## 获取
 
@@ -10,17 +10,17 @@ DeepSeek 全家桶应用 API 的命令行工具：联网搜索、网页抓取、
 
 ```bash
 git clone https://github.com/bluechonk/zcode-plugins.git
-cd zcode-plugins/external_plugins/deepseek-web-search/cli
+cd zcode-plugins/external_plugins/deepseek-toolkit/cli
 ```
 
-`package.json` 里已声明 `bin`，本地链接一次即可全局用 `dws`：
+`package.json` 里已声明 `bin`，本地链接一次即可全局用 `dwt`：
 
 ```bash
 npm link
-dws doctor
+dwt doctor
 ```
 
-不想链接就直接用 Node 跑，下文所有 `dws` 换成 `node src/index.mjs`：
+不想链接就直接用 Node 跑，下文所有 `dwt` 换成 `node src/index.mjs`：
 
 ```bash
 node src/index.mjs search "DeepSeek V4 发布" --count 5
@@ -41,21 +41,21 @@ node src/index.mjs doctor
 ## 命令
 
 ```bash
-dws search <query> [options]
-dws fetch <url> [options]
-dws ocr <file> [options]
-dws asr <file> [options]
-dws tts <text> --out <path> [options]
-dws doctor
+dwt search <query> [options]
+dwt fetch <url> [options]
+dwt ocr <file> [options]
+dwt asr <file> [options]
+dwt tts <text> --out <path> [options]
+dwt doctor
 ```
 
 ### search
 
 ```bash
-dws search "DeepSeek V4 发布" --count 5
-dws search "site:github.com deepseek" --need-content
-dws search "AI 新闻" --format markdown
-dws search "deepseek after:2026-10-01" --count 20
+dwt search "DeepSeek V4 发布" --count 5
+dwt search "site:github.com deepseek" --need-content
+dwt search "AI 新闻" --format markdown
+dwt search "deepseek after:2026-10-01" --count 20
 ```
 
 | 选项 | 说明 |
@@ -71,8 +71,8 @@ query 支持搜索语法：`site:`、`-site:`、`-关键词`、`"精确短语"`�
 ### fetch
 
 ```bash
-dws fetch https://api-docs.deepseek.com/zh-cn/guides/search
-dws fetch https://example.com/article --format json
+dwt fetch https://api-docs.deepseek.com/zh-cn/guides/search
+dwt fetch https://example.com/article --format json
 ```
 
 | 选项 | 说明 |
@@ -82,9 +82,9 @@ dws fetch https://example.com/article --format json
 ### ocr
 
 ```bash
-dws ocr 合同.pdf
-dws ocr 扫描件.png --format text
-dws ocr 排版稿.pdf --purpose rich_layout_recognition
+dwt ocr 合同.pdf
+dwt ocr 扫描件.png --format text
+dwt ocr 排版稿.pdf --purpose rich_layout_recognition
 ```
 
 | 选项 | 说明 |
@@ -98,8 +98,8 @@ dws ocr 排版稿.pdf --purpose rich_layout_recognition
 ### asr
 
 ```bash
-dws asr 会议录音.wav
-dws asr 采访.opus --format text
+dwt asr 会议录音.wav
+dwt asr 采访.opus --format text
 ```
 
 | 选项 | 说明 |
@@ -112,9 +112,9 @@ dws asr 采访.opus --format text
 ### tts
 
 ```bash
-dws tts "你好，我是 DeepSeek。" --out speech.wav
-dws tts "今日摘要" --voice tide --out summary.wav
-dws tts "正文" --tts-format pcm --out audio.pcm
+dwt tts "你好，我是 DeepSeek。" --out speech.wav
+dwt tts "今日摘要" --voice tide --out summary.wav
+dwt tts "正文" --tts-format pcm --out audio.pcm
 ```
 
 | 选项 | 说明 |
@@ -130,7 +130,7 @@ dws tts "正文" --tts-format pcm --out audio.pcm
 ### doctor
 
 ```bash
-dws doctor
+dwt doctor
 ```
 
 用一次最小 Search 探测 Key 与连通性。

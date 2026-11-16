@@ -1,5 +1,5 @@
 {
-  "name": "deepseek-web-search",
+  "name": "deepseek-toolkit",
   "version": "0.2.0",
   "description": "DeepSeek 全家桶应用 API：联网搜索、网页抓取、OCR、语音识别、语音合成，零依赖 CLI 加配套 command、skill 与 MCP 服务。",
   "description_i18n": {

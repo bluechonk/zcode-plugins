@@ -20,4 +20,4 @@ python3 scripts/validate.py
 
 ## assets/
 
-`assets/deepseek-web-search/icon.png` 为本仓库自绘几何图形，不含任何第三方品牌素材。
+`assets/deepseek-toolkit/icon.png` 为本仓库自绘几何图形，不含任何第三方品牌素材。

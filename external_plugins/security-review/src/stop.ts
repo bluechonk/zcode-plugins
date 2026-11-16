@@ -5,14 +5,16 @@
  *   1. 判定阻塞之前，先把基线推进到当前工作树——模型若什么都不改，下次 Stop 的
  *      diff 为空，直接放行。
  *   2. 每轮最多阻塞 MAX_BLOCKS 次（默认 2），计数在 UserPromptSubmit 时清零。
- *   3. 网关报错、模型解析不到、输出不是 JSON 一律放行——审查自身故障不阻断收尾。
+ *   3. 配置读不到、请求失败、输出不是 JSON 一律放行——审查自身故障不阻断收尾。
+ *
+ * 审查请求**完全复用当前会话的模型配置**（provider / baseUrl / 密钥 / 模型 id，
+ * 见 lib/review.ts 的 resolveSessionConfig）：插件不掌握任何默认接入点，
+ * 读不到就跳过，绝不猜一个地址发出去。
  */
 
 import { disabled, emitStopBlock, envInt, readHookInput, readState, writeState } from "./lib/hook";
 import { captureBaseline, diffSince } from "./lib/git";
-import { resolveModel, reviewDiff, type Finding } from "./lib/review";
-
-const DEFAULT_BASE_URL = "http://127.0.0.1:4412/v1";
+import { resolveSessionConfig, reviewDiff, type Finding } from "./lib/review";
 
 const SEVERITY_LABEL: Record<string, string> = {
   high: "高",
@@ -55,15 +57,17 @@ async function main(): Promise<void> {
   const diff = diffSince(base.cwd, base.sha, envInt("SECURITY_REVIEW_MAX_DIFF_BYTES", 60_000));
   if (!diff.text.trim() || diff.files === 0) return;
 
-  const model = resolveModel(sessionId);
-  if (!model) {
-    // 解析不到模型就跳过；不提示，避免每轮都往上下文里塞一行噪音
+  const config = resolveSessionConfig(sessionId);
+  if (!config) {
+    // 读不到会话的模型配置（会话库不可读 / 该 provider 没配接入点）就跳过。
+    // 不提示：每轮都塞一行噪音比跳过更糟；配置问题由 SessionStart 那边报。
     return;
   }
 
   const outcome = await reviewDiff({
-    baseUrl: process.env["SECURITY_REVIEW_BASE_URL"] ?? DEFAULT_BASE_URL,
-    model,
+    baseUrl: config.baseUrl,
+    apiKey: config.apiKey,
+    model: config.modelId,
     diff: diff.text,
     timeoutMs: envInt("SECURITY_REVIEW_TIMEOUT_MS", 120_000),
   });

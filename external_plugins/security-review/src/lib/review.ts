@@ -1,16 +1,21 @@
 /**
- * 审查后端：确定用哪个模型，然后调用本机网关做一次 diff 安全审查。
+ * 审查后端：复用「当前会话那套模型配置」做一次 diff 安全审查。
  *
- * 两个必须处理的现实：
+ * 三个必须处理的现实：
  *   1. hook 入参里没有模型信息（ZCode 只注入 session_id / cwd / tool_* 等），
- *      所以「当前在跑的模型」只能从 ZCode 的会话库里反查。
+ *      所以配置只能从 ZCode 的会话库 + provider 配置里反查。
  *   2. 部分模型把输出写在 reasoning_content 而不是 content；只读 content 会
  *      永远拿到空串，表现为「审查没问题」——这是静默失效，最难发现。
+ *   3. 模型名与接入点分属两个 provider（longcat 官方 / 本机网关）时，
+ *      名字对不上就 400。所以 baseUrl 与密钥必须跟着会话的 provider 走，
+ *      不允许插件自己拼默认值。
  */
 
 import { DatabaseSync } from "node:sqlite";
 import { homedir } from "node:os";
 import { join } from "node:path";
+
+import { providerEndpoint } from "./providers";
 
 export interface Finding {
   severity: string;
@@ -20,45 +25,68 @@ export interface Finding {
 }
 
 export interface ReviewOutcome {
-  status: "ok" | "no-model" | "transport-error";
+  status: "ok" | "no-config" | "transport-error";
   findings: Finding[];
   note?: string;
 }
 
 const ZCODE_DB = join(homedir(), ".zcode", "cli", "db", "db.sqlite");
 
-/** 显式指定优先；否则问 ZCode 这个会话最近一次实际用的是哪个模型 */
-export function resolveModel(sessionId: string): string | null {
-  const explicit = process.env["SECURITY_REVIEW_MODEL"];
-  if (explicit) return explicit;
+export interface SessionModelConfig {
+  modelId: string;
+  providerId: string;
+  baseUrl: string;
+  apiKey: string;
+}
 
+/**
+ * 取当前会话在用的完整模型配置。
+ *
+ * 缺一环就返回 null，**不回落任何默认值**：模型名、providerId 从会话库读，
+ * baseUrl 与 apiKey 从 ZCode 的 provider 配置读。读不到就不发这次审查——
+ * 宁可跳过，也不把请求发到一个猜测的地址。
+ */
+export function resolveSessionConfig(sessionId: string): SessionModelConfig | null {
+  let providerId = "";
+  let modelId = "";
   try {
     const db = new DatabaseSync(ZCODE_DB, { readOnly: true });
     try {
       const last = db
         .prepare(
-          `SELECT json_extract(data,'$.modelId') AS m FROM message
+          `SELECT json_extract(data,'$.modelId') AS m, json_extract(data,'$.providerId') AS p
+           FROM message
            WHERE session_id = ? AND json_extract(data,'$.semantics.kind') = 'assistant_response'
            ORDER BY sequence DESC LIMIT 1`
         )
-        .get(sessionId) as { m?: string } | undefined;
-      if (last?.m) return last.m;
-
-      const asked = db
-        .prepare(
-          `SELECT json_extract(data,'$.modelSelection.modelId') AS m FROM message
-           WHERE session_id = ? AND json_extract(data,'$.semantics.kind') = 'user_prompt'
-           ORDER BY sequence DESC LIMIT 1`
-        )
-        .get(sessionId) as { m?: string } | undefined;
-      return asked?.m ?? null;
+        .get(sessionId) as { m?: string; p?: string } | undefined;
+      if (last?.m) {
+        modelId = last.m;
+        providerId = last.p ?? "";
+      } else {
+        const asked = db
+          .prepare(
+            `SELECT json_extract(data,'$.modelSelection.modelId') AS m,
+                    json_extract(data,'$.modelSelection.providerId') AS p
+             FROM message
+             WHERE session_id = ? AND json_extract(data,'$.semantics.kind') = 'user_prompt'
+             ORDER BY sequence DESC LIMIT 1`
+          )
+          .get(sessionId) as { m?: string; p?: string } | undefined;
+        modelId = asked?.m ?? "";
+        providerId = asked?.p ?? "";
+      }
     } finally {
       db.close();
     }
   } catch {
-    // 会话库不可读：交给调用方跳过，不要因此阻断 Stop
-    return null;
+    return null; // 会话库不可读：跳过，不阻断 Stop
   }
+
+  if (!modelId || !providerId) return null;
+  const endpoint = providerEndpoint(providerId);
+  if (!endpoint) return null;
+  return { modelId, providerId, baseUrl: endpoint.baseUrl, apiKey: endpoint.apiKey };
 }
 
 const SYSTEM_PROMPT = [
@@ -101,6 +129,7 @@ function toFindings(parsed: unknown): Finding[] {
 
 export async function reviewDiff(opts: {
   baseUrl: string;
+  apiKey: string;
   model: string;
   diff: string;
   timeoutMs: number;
@@ -110,7 +139,11 @@ export async function reviewDiff(opts: {
   try {
     res = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        // 用会话自己的密钥：接入点与凭据必须成套，换一个 provider 就换一套
+        Authorization: `Bearer ${opts.apiKey}`,
+      },
       body: JSON.stringify({
         model: opts.model,
         stream: false,

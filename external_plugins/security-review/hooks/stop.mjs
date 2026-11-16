@@ -135,33 +135,68 @@ ${lines.map((l) => `+${l}`).join("\n")}`);
 
 // external_plugins/security-review/src/lib/review.ts
 import { DatabaseSync } from "node:sqlite";
+import { homedir as homedir3 } from "node:os";
+import { join as join3 } from "node:path";
+
+// external_plugins/security-review/src/lib/providers.ts
+import { readFileSync as readFileSync3 } from "node:fs";
 import { homedir as homedir2 } from "node:os";
 import { join as join2 } from "node:path";
-var ZCODE_DB = join2(homedir2(), ".zcode", "cli", "db", "db.sqlite");
-function resolveModel(sessionId) {
-  const explicit = process.env["SECURITY_REVIEW_MODEL"];
-  if (explicit) return explicit;
+var PROVIDER_CONFIG = join2(homedir2(), ".zcode", "v2", "provider_config.json");
+function providerEndpoint(providerId) {
+  if (!providerId) return null;
+  try {
+    const parsed = JSON.parse(readFileSync3(PROVIDER_CONFIG, "utf8"));
+    const rules = parsed.config?.providerConfigRules?.providerRules ?? [];
+    const rule = rules.find((r) => r.providerId === providerId);
+    const api = rule?.config?.api;
+    const access = rule?.config?.access;
+    if (!api?.baseUrl || api.type !== "openai-chat-completions") return null;
+    if (access?.type !== "api-key" || !access.apiKey) return null;
+    return { baseUrl: api.baseUrl.replace(/\/+$/, ""), apiKey: access.apiKey };
+  } catch {
+    return null;
+  }
+}
+
+// external_plugins/security-review/src/lib/review.ts
+var ZCODE_DB = join3(homedir3(), ".zcode", "cli", "db", "db.sqlite");
+function resolveSessionConfig(sessionId) {
+  let providerId = "";
+  let modelId = "";
   try {
     const db = new DatabaseSync(ZCODE_DB, { readOnly: true });
     try {
       const last = db.prepare(
-        `SELECT json_extract(data,'$.modelId') AS m FROM message
+        `SELECT json_extract(data,'$.modelId') AS m, json_extract(data,'$.providerId') AS p
+           FROM message
            WHERE session_id = ? AND json_extract(data,'$.semantics.kind') = 'assistant_response'
            ORDER BY sequence DESC LIMIT 1`
       ).get(sessionId);
-      if (last?.m) return last.m;
-      const asked = db.prepare(
-        `SELECT json_extract(data,'$.modelSelection.modelId') AS m FROM message
-           WHERE session_id = ? AND json_extract(data,'$.semantics.kind') = 'user_prompt'
-           ORDER BY sequence DESC LIMIT 1`
-      ).get(sessionId);
-      return asked?.m ?? null;
+      if (last?.m) {
+        modelId = last.m;
+        providerId = last.p ?? "";
+      } else {
+        const asked = db.prepare(
+          `SELECT json_extract(data,'$.modelSelection.modelId') AS m,
+                    json_extract(data,'$.modelSelection.providerId') AS p
+             FROM message
+             WHERE session_id = ? AND json_extract(data,'$.semantics.kind') = 'user_prompt'
+             ORDER BY sequence DESC LIMIT 1`
+        ).get(sessionId);
+        modelId = asked?.m ?? "";
+        providerId = asked?.p ?? "";
+      }
     } finally {
       db.close();
     }
   } catch {
     return null;
   }
+  if (!modelId || !providerId) return null;
+  const endpoint = providerEndpoint(providerId);
+  if (!endpoint) return null;
+  return { modelId, providerId, baseUrl: endpoint.baseUrl, apiKey: endpoint.apiKey };
 }
 var SYSTEM_PROMPT = [
   "\u4F60\u662F\u5B89\u5168\u5BA1\u67E5\u5458\uFF0C\u53EA\u505A\u53EA\u8BFB\u5206\u6790\u3002",
@@ -200,7 +235,11 @@ async function reviewDiff(opts) {
   try {
     res = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        // 用会话自己的密钥：接入点与凭据必须成套，换一个 provider 就换一套
+        Authorization: `Bearer ${opts.apiKey}`
+      },
       body: JSON.stringify({
         model: opts.model,
         stream: false,
@@ -235,7 +274,6 @@ ${opts.diff}` }
 }
 
 // external_plugins/security-review/src/stop.ts
-var DEFAULT_BASE_URL = "http://127.0.0.1:4412/v1";
 var SEVERITY_LABEL = {
   high: "\u9AD8",
   medium: "\u4E2D",
@@ -268,13 +306,14 @@ async function main() {
   if (!base?.sha || !base.cwd) return;
   const diff = diffSince(base.cwd, base.sha, envInt("SECURITY_REVIEW_MAX_DIFF_BYTES", 6e4));
   if (!diff.text.trim() || diff.files === 0) return;
-  const model = resolveModel(sessionId);
-  if (!model) {
+  const config = resolveSessionConfig(sessionId);
+  if (!config) {
     return;
   }
   const outcome = await reviewDiff({
-    baseUrl: process.env["SECURITY_REVIEW_BASE_URL"] ?? DEFAULT_BASE_URL,
-    model,
+    baseUrl: config.baseUrl,
+    apiKey: config.apiKey,
+    model: config.modelId,
     diff: diff.text,
     timeoutMs: envInt("SECURITY_REVIEW_TIMEOUT_MS", 12e4)
   });

@@ -57,11 +57,18 @@
 - 未跟踪的新文件按「整份新增」补进 diff（新文件是漏洞高发处），上限 20 个、每个 400 行
 - diff 总计上限 60 KB，超出截断
 
-## 模型怎么定
+## 模型配置怎么来：完全复用当前会话
 
-`Stop` 时 hook 入参里**没有模型信息**（ZCode 只注入 `session_id` / `cwd` / `tool_*` / `agent_type`），所以按会话 id 回查 ZCode 的会话库，取该会话最近一次实际使用的模型。
+`Stop` 的 hook 入参里**没有模型信息**（ZCode 只注入 `session_id` / `cwd` / `tool_*` / `agent_type`），所以插件回查两处：
 
-显式指定优先：设 `SECURITY_REVIEW_MODEL` 就不再查库。
+| 取什么 | 从哪取 |
+| --- | --- |
+| `providerId` + `modelId` | ZCode 会话库 `message`（`assistant_response` 优先，`user_prompt` 兜底） |
+| `baseUrl` + `apiKey` | `~/.zcode/v2/provider_config.json` 里该 provider 的接入点 |
+
+**没有任何默认接入点。** 任一项读不到就跳过本轮审查，不发请求。
+
+为什么必须这样：provider 是两个独立配置空间——同一个模型名在 longcat 官方（`LongCat-2.5` @ `api.longcat.chat`）与本机网关（`longcat-2.5` @ `127.0.0.1:4412`）是不同的接入点。早先把 baseUrl 硬编码成网关、模型名却取自会话，于是会话跑 longcat 时审查请求被发进网关，网关只认自己的模型清单 → `400 unknown_model`。而失败被当传输错误静默放行，故障藏了十几天。
 
 **两个字段都读**：部分模型把结论写在 `reasoning_content`、`content` 是空串，只读 `content` 会永远得到「没问题」——这是静默失效，最难发现。
 
@@ -71,18 +78,18 @@
 
 1. **判定阻塞之前先推进基线**——模型若什么都不改，下次 `Stop` 的 diff 为空，直接放行
 2. 每轮最多阻塞 `SECURITY_REVIEW_MAX_BLOCKS` 次（默认 2），计数在 `UserPromptSubmit` 时清零
-3. 网关报错、模型解析不到、输出不是 JSON 一律放行
+3. 配置读不到、请求失败、输出不是 JSON 一律放行
 
 ## 环境变量
 
 | 变量 | 默认 | 说明 |
 | --- | --- | --- |
 | `SECURITY_REVIEW_DISABLE` | — | 设 `1` 整体关闭 |
-| `SECURITY_REVIEW_BASE_URL` | `http://127.0.0.1:4412/v1` | 审查用的 OpenAI 兼容端点 |
-| `SECURITY_REVIEW_MODEL` | 查会话库 | 显式指定审查模型 |
 | `SECURITY_REVIEW_MAX_BLOCKS` | `2` | 每轮最多阻塞次数 |
 | `SECURITY_REVIEW_MAX_DIFF_BYTES` | `60000` | 送审 diff 上限 |
 | `SECURITY_REVIEW_TIMEOUT_MS` | `120000` | 审查请求超时 |
+
+**模型相关的环境变量已删除**（`SECURITY_REVIEW_BASE_URL` / `SECURITY_REVIEW_MODEL`）：审查必须走当前会话那套配置，插件不提供旁路。
 
 ## 已知误报
 

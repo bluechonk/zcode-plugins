@@ -1,5 +1,5 @@
 {
-  "description": "repo-guardian：仓库健康检查、本机规则执行与注释规范核对。",
+  "description": "repo-guardian：仓库健康检查（CI、LF 与 .gitattributes、凭据与产物不入库）、提交前自查提示、本机规则执行与注释规范核对。",
   "hooks": {
     "SessionStart": [
       {
@@ -11,7 +11,7 @@
             "args": [
               "${ZCODE_PLUGIN_ROOT}/hooks/session-start.mjs"
             ],
-            "timeoutMs": 5000,
+            "timeoutMs": 12000,
             "statusMessage": "repo-guardian：检查仓库健康…"
           }
         ]

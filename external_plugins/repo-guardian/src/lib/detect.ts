@@ -34,10 +34,6 @@ export function hasCI(root: string): boolean {
   }
 }
 
-export function hasGitattributes(root: string): boolean {
-  return existsSync(join(root, ".gitattributes"));
-}
-
 /** README 的中文占比；读不到返回 null */
 export function readmeChineseRatio(root: string): number | null {
   const p = join(root, "README.md");
@@ -141,5 +137,113 @@ export function bashChineseStdout(command: string): boolean {
     return true;
   }
   return false;
+}
+
+/**
+ * 凭据形态的文件名。
+ *
+ * 只收「一看就是凭据」的形态，不收「可能是配置」的宽泛名字：
+ * config.json 之类误报率太高，报一次就要模型花一轮去解释。
+ * `.env.example` / `.env.sample` / `.env.template` 是模板，明确排除。
+ */
+const CREDENTIAL_NAME =
+  /(?:^|\/)(?:\.env\.(?:local|dev|development|prod|production|test|ci|stage|staging)$|\.env$|[^/]*\.(?:pem|key|p12|pfx|jks|keystore|kdbx)$|id_rsa(?:$|[._2]|\.pub)|id_ed2519(?:$|[._2])|\.htpasswd$|credentials$|service-account(?:[-.][^/]*)?\.json$|secrets?\.ya?ml$)/iu;
+const CREDENTIAL_TEMPLATE = /(?:^|\/)\.env\.(?:example|sample|template|dist)$/iu;
+
+export function isCredentialPath(filePath: string): boolean {
+  const p = filePath.replace(/\\/gu, "/");
+  if (CREDENTIAL_TEMPLATE.test(p)) return false;
+  return CREDENTIAL_NAME.test(p);
+}
+
+/** 构建产物与运行时数据的路径形态 */
+const ARTIFACT_DIR =
+  /^(?:node_modules|dist|build|out|coverage|target|bin|obj|\.next|\.nuxt|\.turbo|__pycache__|\.venv|venv|env)\//iu;
+const ARTIFACT_FILE = /(?:\.tsbuildinfo|\.pyc|\.pyo|\.o|\.a|\.lib|\.exp|\.map)$/iu;
+
+export function isArtifactPath(filePath: string): boolean {
+  const p = filePath.replace(/\\/gu, "/");
+  return ARTIFACT_DIR.test(p) || ARTIFACT_FILE.test(p);
+}
+
+export interface GitCommandInfo {
+  /** 命令链里最高优先级的意图：提交、暂存、推送、改写历史 */
+  intent: "commit" | "add" | "push" | "history-rewrite" | null;
+  /** `git add` 的目标路径（不含选项） */
+  addTargets: string[];
+  /** `git add -f` / `--force`：把被忽略的文件硬塞进来 */
+  forceAdd: boolean;
+  /** `git push --force` 及等价写法 */
+  forcePush: boolean;
+  /** filter-branch / filter-repo / BFG：改写历史的命令 */
+  historyRewrite: boolean;
+}
+
+/** 按 && / || / ; / | / 换行 把命令链拆成单条 */
+function segments(command: string): string[] {
+  return command
+    .split(/(?:&&|\|\||;|\||\n)/u)
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+/** `git` 可能带路径前缀或选项出现在段首，取到子命令名 */
+function gitSubcommand(segment: string): string[] | null {
+  const tokens = segment.split(/\s+/u);
+  const gitIndex = tokens.findIndex((t) => t === "git" || t.endsWith("/git") || t.endsWith("git.exe"));
+  if (gitIndex < 0) return null;
+  return tokens.slice(gitIndex + 1);
+}
+
+/**
+ * 识别这条命令链里的 git 意图。
+ *
+ * 提交前自查（git status / diff / 敏感词扫描）只能在「模型要提交」这一刻提醒才有用，
+ * 所以得从命令里认出 commit / add / push，而不是凭空每轮都说一遍。
+ */
+export function analyzeGitCommand(command: string): GitCommandInfo {
+  const info: GitCommandInfo = {
+    intent: null,
+    addTargets: [],
+    forceAdd: false,
+    forcePush: false,
+    historyRewrite: false,
+  };
+
+  for (const seg of segments(command)) {
+    const rest = gitSubcommand(seg);
+    if (!rest || rest.length === 0) continue;
+    const sub = rest[0] ?? "";
+
+    if (sub === "commit") {
+      info.intent = info.intent ?? "commit";
+    } else if (sub === "add") {
+      info.intent = info.intent ?? "add";
+      if (rest.some((t) => t === "-f" || t === "--force")) info.forceAdd = true;
+      for (const t of rest.slice(1)) if (!t.startsWith("-")) info.addTargets.push(t);
+    } else if (sub === "push") {
+      info.intent = info.intent ?? "push";
+      if (rest.some((t) => t === "-f" || t === "--force" || t === "--force-with-lease=false")) {
+        info.forcePush = true;
+      }
+    } else if (sub === "filter-branch" || sub === "filter-repo") {
+      info.historyRewrite = true;
+      info.intent = info.intent ?? "history-rewrite";
+    }
+  }
+
+  // BFG 是独立可执行文件或 java -jar，不是 git 子命令；只认「命令位置上的 bfg」
+  // 与任意位置的 bfg\*.jar，避免把路径里恰好含 bfg 的文件误判
+  for (const seg of segments(command)) {
+    const first = (seg.split(/\s+/u)[0] ?? "").toLowerCase();
+    if (first === "bfg" || first.endsWith("/bfg") || first.endsWith("\\bfg")) {
+      info.historyRewrite = true;
+      break;
+    }
+  }
+  if (!info.historyRewrite && /bfg[\w.-]*\.jar/iu.test(command)) info.historyRewrite = true;
+  if (info.historyRewrite) info.intent = info.intent ?? "history-rewrite";
+
+  return info;
 }
 

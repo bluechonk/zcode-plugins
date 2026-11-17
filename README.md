@@ -72,7 +72,7 @@ node scripts/validate.mjs
 | DeepSeek 全家桶 | `deepseek-toolkit` | DeepSeek 官方应用 API：联网搜索、网页抓取、OCR、语音识别、语音合成 | Node.js >= 18；`DEEPSEEK_API_KEY` |
 | 文件规划 | `plan-with-files` | 进度台账 + 三方一致性核对，替代 ZCode 内置 plan 模式 | Node.js >= 22 |
 | 安全审查 | `security-review` | 编辑后即时扫安全模式；每轮收尾用当前模型审本轮 git diff | Node.js >= 22 |
-| 仓库守卫 | `repo-guardian` | 仓库健康检查（CI、.gitattributes、README）+ 本机规则检测 | Node.js >= 22 |
+| 仓库守卫 | `repo-guardian` | 仓库健康检查（CI、LF 与 .gitattributes、凭据与产物不入库）+ 提交前自查 + 本机规则执行 | Node.js >= 22 |
 
 各自的组件、用法与配置见对应插件的 README：
 

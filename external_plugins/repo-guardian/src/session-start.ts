@@ -1,8 +1,8 @@
 /**
- * SessionStart：仓库健康检测 + 注释规范卡。
+ * SessionStart：仓库健康检测 + 规范卡。
  *
  * 健康检查只在会话启动时扫一次，把「机器可判定但模型不会主动去看」的仓库状态摆到台面上：
- * CI 有没有、.gitattributes 有没有、README 是不是中文。三项都干净就不注入这一段。
+ * CI 有没有、.gitattributes 达不达标、README 是不是中文、有没有凭据与产物入库。都干净就不注入这一段。
  *
  * 规范卡是给「机器判不了」的那部分规则留的位置：能不能写 why、算不算复述代码，
  * 只能靠模型自觉，PostToolUse 的检测覆盖不到。这几条原本常驻 AGENTS.md，
@@ -11,7 +11,8 @@
 
 import { disabled, emit, isSubagent, readHookInput } from "./lib/hook";
 import { cwdOf } from "./lib/hook";
-import { findRepoRoot, hasCI, hasGitattributes, readmeChineseRatio } from "./lib/detect";
+import { findRepoRoot, hasCI, readmeChineseRatio } from "./lib/detect";
+import { hygieneFindingLines, hygieneReport } from "./lib/hygiene";
 
 /**
  * README 中文占比低于此值视为非中文文档。
@@ -48,6 +49,28 @@ const COMMENT_RULES = [
   "   这条机器判不了（两者写法相同），靠自觉。",
   "10. Bash 内建（echo / printf）输出中文会被按系统代码页（本机 GBK/936）解码而乱码：",
   "    包一层 `| iconv -f UTF-8 -t GBK`，或把中文交给外部程序。pwsh 与外部程序不受影响。",
+].join("\n");
+
+/**
+ * 仓库卫生规范卡。
+ *
+ * 这四条原本常驻 AGENTS.md 的「编码 / 仓库卫生」。其中能被机器判定的部分已经拆出去了：
+ * 仓库状态（.gitattributes、凭据、产物、CRLF）由上面的健康检查核对，
+ * 提交前自查由 PreToolUse 在 `git commit` 那一刻注入。
+ * 卡片留在这里，是因为「哪一步该先做什么」这个顺序感判不了，又必须每次都在场。
+ */
+const HYGIENE_RULES = [
+  "[repo-guardian] 仓库卫生规范（提交前后各核对一次）：",
+  "",
+  "1. 仓库内文本文件一律 LF；每个 git 仓库必须有 .gitattributes，至少包含 `* text=auto eol=lf`。",
+  "   存量仓库在下次改动时补齐，不专门开一次「只改换行符」的提交。",
+  "2. 严禁提交凭据：apikey / accesskey / secret key / token / 密码 / 私钥 / 证书 / 数据库连接串，",
+  "   以及含真实凭据的 .env / .pem / .key。敏感内容走环境变量或密钥管理服务，并写进 .gitignore。",
+  "   模板文件（.env.example 之类）可以入库，但值必须是占位符。",
+  "3. 提交前自查三件事：git status、git diff、敏感词扫描。误提交立即撤销、轮换凭据并清理历史——",
+  "   只删文件不算处理完，凭据在历史里就还在。",
+  "4. 构建产物与运行时数据不入库：dist/、node_modules/、运行时数据目录。",
+  "   已经被跟踪的先 git rm -r --cached，再补 .gitignore。",
 ].join("\n");
 
 async function main(): Promise<void> {
@@ -89,9 +112,8 @@ async function main(): Promise<void> {
       );
     }
 
-    if (!hasGitattributes(root)) {
-      health.push("缺少 .gitattributes：按仓库规范必须存在，且至少包含 `* text=auto eol=lf`。", "");
-    }
+    const hygiene = hygieneReport(root);
+    health.push(...hygieneFindingLines(hygiene));
 
     const ratio = readmeChineseRatio(root);
     if (ratio !== null && ratio < MIN_CHINESE_RATIO) {
@@ -100,12 +122,14 @@ async function main(): Promise<void> {
 
     if (health.length > 0) {
       lines.push("[repo-guardian] 仓库健康检查结果：", "", ...health);
-      lines.push("以上只是提示，不是阻塞。判断本仓库确实不需要某项时直接说明理由继续。");
+      lines.push("以上只是提示，不是阻塞。判断本仓库确实不需要某项时直接说明理由继续。", "");
     }
   }
 
   if (lines.length > 0) lines.push("");
   lines.push(COMMENT_RULES);
+  lines.push("");
+  lines.push(HYGIENE_RULES);
 
   emit("SessionStart", { additionalContext: lines.join("\n") });
 }

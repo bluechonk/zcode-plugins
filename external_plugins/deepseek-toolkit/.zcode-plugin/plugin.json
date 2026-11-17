@@ -1,0 +1,100 @@
+{
+  "name": "deepseek-toolkit",
+  "version": "0.2.0",
+  "description": "DeepSeek 全家桶应用 API：联网搜索、网页抓取、OCR、语音识别、语音合成，零依赖 CLI 加配套 command、skill 与 MCP 服务。",
+  "description_i18n": {
+    "en": "DeepSeek application APIs: web search, page fetch, OCR, speech recognition and text to speech, as a zero-dependency CLI plus matching commands, skills and MCP servers.",
+    "zh-CN": "DeepSeek 全家桶应用 API：联网搜索、网页抓取、OCR、语音识别、语音合成，零依赖 CLI，并配套 command、skill 与 MCP 服务。"
+  },
+  "author": {
+    "name": "bluechonk",
+    "url": "https://github.com/bluechonk"
+  },
+  "repository": "https://github.com/bluechonk/zcode-plugins",
+  "homepage": "https://api-docs.deepseek.com/zh-cn/guides/search",
+  "license": "MIT",
+  "keywords": [
+    "deepseek",
+    "web-search",
+    "search",
+    "fetch",
+    "ocr",
+    "asr",
+    "tts",
+    "speech",
+    "mcp",
+    "rag"
+  ],
+  "skills": "./skills",
+  "commands": "./commands",
+  "mcpServers": {
+    "deepseek_web_search": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "${ZCODE_PLUGIN_ROOT}/cli/src/mcp-search.mjs"
+      ],
+      "cwd": "${ZCODE_PROJECT_DIR}",
+      "timeoutMs": 60000,
+      "env": {
+        "DEEPSEEK_BASE_URL": "${user_config.base_url}"
+      }
+    },
+    "deepseek_web_fetch": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "${ZCODE_PLUGIN_ROOT}/cli/src/mcp-fetch.mjs"
+      ],
+      "cwd": "${ZCODE_PROJECT_DIR}",
+      "timeoutMs": 60000,
+      "env": {
+        "DEEPSEEK_BASE_URL": "${user_config.base_url}"
+      }
+    },
+    "deepseek_ocr": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "${ZCODE_PLUGIN_ROOT}/cli/src/mcp-ocr.mjs"
+      ],
+      "cwd": "${ZCODE_PROJECT_DIR}",
+      "timeoutMs": 300000,
+      "env": {
+        "DEEPSEEK_BASE_URL": "${user_config.base_url}"
+      }
+    },
+    "deepseek_asr": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "${ZCODE_PLUGIN_ROOT}/cli/src/mcp-asr.mjs"
+      ],
+      "cwd": "${ZCODE_PROJECT_DIR}",
+      "timeoutMs": 300000,
+      "env": {
+        "DEEPSEEK_BASE_URL": "${user_config.base_url}"
+      }
+    },
+    "deepseek_tts": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "${ZCODE_PLUGIN_ROOT}/cli/src/mcp-tts.mjs"
+      ],
+      "cwd": "${ZCODE_PROJECT_DIR}",
+      "timeoutMs": 180000,
+      "env": {
+        "DEEPSEEK_BASE_URL": "${user_config.base_url}"
+      }
+    }
+  },
+  "userConfig": {
+    "base_url": {
+      "type": "string",
+      "title": "API 地址",
+      "default": "",
+      "description": "可选。DeepSeek API 地址覆盖，留空使用 https://api.deepseek.com。仅在代理或测试环境填写。"
+    }
+  }
+}

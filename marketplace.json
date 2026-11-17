@@ -11,33 +11,36 @@
   },
   "plugins": [
     {
-      "name": "deepseek-web-search",
-      "source": "./external_plugins/deepseek-web-search",
-      "version": "0.1.1",
-      "description": "DeepSeek official web search and page fetch: zero-dependency CLI plus matching commands, skills and MCP servers.",
+      "name": "deepseek-toolkit",
+      "source": "./external_plugins/deepseek-toolkit",
+      "version": "0.2.0",
+      "description": "DeepSeek 全家桶应用 API：联网搜索、网页抓取、OCR、语音识别、语音合成，零依赖 CLI 加配套 command、skill 与 MCP 服务。",
       "description_i18n": {
-        "en": "DeepSeek official web search and page fetch: zero-dependency CLI plus matching commands, skills and MCP servers.",
-        "zh-CN": "DeepSeek 官方联网搜索与网页抓取：零依赖 CLI，并配套 command、skill 与 MCP 服务。"
+        "en": "DeepSeek application APIs: web search, page fetch, OCR, speech recognition and text to speech, as a zero-dependency CLI plus matching commands, skills and MCP servers.",
+        "zh-CN": "DeepSeek 全家桶应用 API：联网搜索、网页抓取、OCR、语音识别、语音合成，零依赖 CLI，并配套 command、skill 与 MCP 服务。"
       },
-      "displayName": "DeepSeek 联网搜索",
+      "displayName": "DeepSeek 全家桶",
       "displayName_i18n": {
-        "en": "DeepSeek Web Search",
-        "zh-CN": "DeepSeek 联网搜索"
+        "en": "DeepSeek Toolkit",
+        "zh-CN": "DeepSeek 全家桶"
       },
       "author": {
         "name": "bluechonk",
         "url": "https://github.com/bluechonk"
       },
       "category": "developer-tools",
-      "icon": "https://raw.githubusercontent.com/bluechonk/zcode-plugins/main/assets/deepseek-web-search/icon.png",
+      "icon": "https://raw.githubusercontent.com/bluechonk/zcode-plugins/main/assets/deepseek-toolkit/icon.png",
       "homepage": "https://api-docs.deepseek.com/zh-cn/guides/search",
       "tags": [
         "deepseek",
         "web-search",
         "fetch",
+        "ocr",
+        "asr",
+        "tts",
+        "speech",
         "mcp",
-        "cli",
-        "rag"
+        "cli"
       ]
     },
     {

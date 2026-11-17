@@ -61,13 +61,47 @@ function formatFetchMarkdown(data) {
   return `${title ? `# ${title}\n\n` : ""}${content}\n`;
 }
 
+// OCR / ASR 的正文可能很长，text 与 markdown 只给正文，页码信息放进行内标题
+function formatPagesText(data) {
+  const pages = Array.isArray(data?.pages) ? data.pages : [];
+  if (pages.length === 0) return "No recognized pages.\n";
+  return pages
+    .map((page) => {
+      const head = pages.length > 1 ? `----- page ${page.index + 1} -----\n` : "";
+      return `${head}${page.text ?? ""}`;
+    })
+    .join("\n");
+}
+
+function formatPagesMarkdown(data) {
+  const pages = Array.isArray(data?.pages) ? data.pages : [];
+  if (pages.length === 0) return "No recognized pages.\n";
+  if (pages.length === 1) return `${pages[0].text ?? ""}\n`;
+  return pages
+    .map((page) => `### 第 ${page.index + 1} 页\n\n${page.text ?? ""}`)
+    .join("\n\n");
+}
+
+function formatTtsText(data) {
+  const size = data?.bytes ?? 0;
+  return `Saved ${data?.outPath ?? "(nowhere)"} (${size} bytes, ${data?.format ?? "wav"}, voice ${data?.voiceId ?? "-"}).\n`;
+}
+
 // 按 kind 选择渲染器；未知格式回退 json。
 export function render(kind, data, format) {
   if (format === "text") {
-    return kind === "search" ? formatSearchText(data) : formatFetchText(data);
+    if (kind === "search") return formatSearchText(data);
+    if (kind === "ocr") return formatPagesText(data);
+    if (kind === "asr") return `${data?.text ?? ""}\n`;
+    if (kind === "tts") return formatTtsText(data);
+    return formatFetchText(data);
   }
   if (format === "markdown") {
-    return kind === "search" ? formatSearchMarkdown(data) : formatFetchMarkdown(data);
+    if (kind === "search") return formatSearchMarkdown(data);
+    if (kind === "ocr") return formatPagesMarkdown(data);
+    if (kind === "asr") return `${data?.text ?? ""}\n`;
+    if (kind === "tts") return formatTtsText(data);
+    return formatFetchMarkdown(data);
   }
   return formatJson(data);
 }

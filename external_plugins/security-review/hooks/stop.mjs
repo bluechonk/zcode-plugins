@@ -133,20 +133,48 @@ ${lines.map((l) => `+${l}`).join("\n")}`);
   return { text: parts.join(""), files, truncated };
 }
 
-// external_plugins/security-review/src/lib/review.ts
-import { DatabaseSync } from "node:sqlite";
-import { homedir as homedir3 } from "node:os";
-import { join as join3 } from "node:path";
-
-// external_plugins/security-review/src/lib/providers.ts
-import { readFileSync as readFileSync3 } from "node:fs";
+// external_plugins/security-review/src/lib/prefs.ts
+import { mkdirSync as mkdirSync2, readFileSync as readFileSync3, readdirSync, writeFileSync as writeFileSync2 } from "node:fs";
 import { homedir as homedir2 } from "node:os";
 import { join as join2 } from "node:path";
-var PROVIDER_CONFIG = join2(homedir2(), ".zcode", "v2", "provider_config.json");
+var DEFAULT_PREFS = { llmReview: true };
+function prefsDir() {
+  const fromEnv = process.env["ZCODE_PLUGIN_DATA"] ?? process.env["CLAUDE_PLUGIN_DATA"];
+  if (fromEnv) return fromEnv;
+  const base = join2(homedir2(), ".zcode", "cli", "plugins", "data");
+  try {
+    const hit = readdirSync(base).find((d) => d.startsWith("security-review@"));
+    if (hit) return join2(base, hit);
+  } catch {
+  }
+  return join2(base, "security-review@bluechonk-plugins");
+}
+function prefsPath() {
+  return join2(prefsDir(), "prefs.json");
+}
+function readPrefs() {
+  try {
+    const parsed = JSON.parse(readFileSync3(prefsPath(), "utf8"));
+    return { llmReview: parsed.llmReview !== false };
+  } catch {
+    return { ...DEFAULT_PREFS };
+  }
+}
+
+// external_plugins/security-review/src/lib/review.ts
+import { DatabaseSync } from "node:sqlite";
+import { homedir as homedir4 } from "node:os";
+import { join as join4 } from "node:path";
+
+// external_plugins/security-review/src/lib/providers.ts
+import { readFileSync as readFileSync4 } from "node:fs";
+import { homedir as homedir3 } from "node:os";
+import { join as join3 } from "node:path";
+var PROVIDER_CONFIG = join3(homedir3(), ".zcode", "v2", "provider_config.json");
 function providerEndpoint(providerId) {
   if (!providerId) return null;
   try {
-    const parsed = JSON.parse(readFileSync3(PROVIDER_CONFIG, "utf8"));
+    const parsed = JSON.parse(readFileSync4(PROVIDER_CONFIG, "utf8"));
     const rules = parsed.config?.providerConfigRules?.providerRules ?? [];
     const rule = rules.find((r) => r.providerId === providerId);
     const api = rule?.config?.api;
@@ -160,7 +188,7 @@ function providerEndpoint(providerId) {
 }
 
 // external_plugins/security-review/src/lib/review.ts
-var ZCODE_DB = join3(homedir3(), ".zcode", "cli", "db", "db.sqlite");
+var ZCODE_DB = join4(homedir4(), ".zcode", "cli", "db", "db.sqlite");
 function resolveSessionConfig(sessionId) {
   let providerId = "";
   let modelId = "";
@@ -301,6 +329,7 @@ async function main() {
   if (event !== "Stop" && event !== "SubagentStop") return;
   const agent = input.agent_type ?? "";
   if (agent && agent !== "zcode-agent") return;
+  if (!readPrefs().llmReview) return;
   const sessionId = input.session_id ?? "default";
   const base = readState(sessionId, "baseline", null);
   if (!base?.sha || !base.cwd) return;

@@ -10,6 +10,7 @@
 
 import { disabled, emit, readHookInput, readState, writeState } from "./lib/hook";
 import { captureBaseline, isRepo } from "./lib/git";
+import { readPrefs } from "./lib/prefs";
 import { resolveSessionConfig } from "./lib/review";
 
 async function main(): Promise<void> {
@@ -27,6 +28,9 @@ async function main(): Promise<void> {
   const sessionId = input.session_id ?? "default";
   writeState(sessionId, "baseline", { sha, cwd, at: new Date().toISOString() });
   writeState(sessionId, "stop", { blocks: 0 });
+
+  // 审查关着就不必再查配置：查了也没用，只会每会话多一条噪音
+  if (!readPrefs().llmReview) return;
 
   const state = readState<{ configWarned?: boolean }>(sessionId, "config", {});
   if (state.configWarned) return;

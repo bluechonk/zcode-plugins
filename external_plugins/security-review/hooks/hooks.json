@@ -1,5 +1,5 @@
 {
-  "description": "security-review：编辑后即时做正则安全模式检查；每轮收尾时用本机网关的当前模型审查本轮 git diff。",
+  "description": "security-review：编辑后即时做正则安全模式检查；每轮收尾时用当前会话的模型审查本轮 git diff，可用 /security-review-on 与 /security-review-off 开关。",
   "hooks": {
     "UserPromptSubmit": [
       {

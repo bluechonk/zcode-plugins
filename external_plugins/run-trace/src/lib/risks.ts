@@ -48,18 +48,40 @@ const HAS_UNBUFFERED_PY = /(?:-u\b|PYTHONUNBUFFERED=1)/u;
  */
 const HAS_REDIRECT = />{1,2}\s*(?!&)\S/u;
 
+/**
+ * 管道里是否有「真正的上游」。
+ *
+ * `grep x | head` 只是查询，没有会失败的进程可丢；`python train.py | grep x`
+ * 才有。判据是第一段不是过滤器——只看管道最后一段会把这些查询也报成风险。
+ */
+function hasNonFilterUpstream(segment: string): boolean {
+  const first = segment.split("|")[0]?.trim() ?? "";
+  if (!first) return false;
+  return !/^(?:grep|egrep|fgrep|rg|ag|ack|awk|sed|head|tail|sort|uniq|jq|cut|wc)\b/u.test(first);
+}
+
 /** 短命令：一眼能看完，落盘反而是负担 */
 const looksShortLived = (command: string): boolean => {
   const trimmed = command.trim();
   if (trimmed.length > 400) return false;
-  // 纯查询类：git status / ls / cat / echo / which / node -v …
-  return /^(?:git\s+(?:status|log|diff|show|branch|remote|rev-parse)|ls|cat|head|tail|echo|printf|which|where|node\s+-v|npm\s+-v|python3?\s+--version|pwd|cd|mkdir|rm|cp|mv|touch)\b/u.test(
-    trimmed
-  );
+  // 纯查询类：git status / ls / cat / grep / node -e …
+  if (
+    /^(?:git\s+(?:status|log|diff|show|branch|remote|rev-parse|ls-files)|ls|cat|head|tail|echo|printf|which|where|node\s+-v|npm\s+-v|python3?\s+--version|pwd|cd|mkdir|rm|cp|mv|touch|grep|rg|ag|ack|find|wc|sort|uniq|jq)\b/u.test(
+      trimmed
+    )
+  ) {
+    return true;
+  }
+  // `node -e "…"` 是即席求值，几毫秒就结束，不该被当成训练脚本
+  return /^(?:node|python3?)\s+-[ec]\b/u.test(trimmed);
 };
 
 /**
  * 判一条 Bash 命令是否会「跑着跑着看不见、死了没现场」。
+ *
+ * 按语句链分别判，不能把整条命令当一个整体：
+ * `node -e "…" && grep -rn foo . | head` 里，前半句是长跑、后半句是纯查询，
+ * 合起来判会得出「长跑经过过滤器」这个不存在的结论（实测踩过）。
  *
  * 返回空数组表示没问题。可能同时命中多条——它们指向不同的补救动作。
  */
@@ -68,50 +90,64 @@ export function traceRisks(command: string): RiskHit[] {
   if (looksShortLived(command)) return [];
 
   const hits: RiskHit[] = [];
-  const longRunning = LONG_RUNNING.test(command);
-  const hasFilter = FILTERING_TAIL.test(command);
-  const persisted = HAS_TEE.test(command) || HAS_REDIRECT.test(command);
+  const seen = new Set<string>();
+  const add = (hit: RiskHit): void => {
+    if (seen.has(hit.rule)) return;
+    seen.add(hit.rule);
+    hits.push(hit);
+  };
 
-  // 长跑 + 过滤 + 没落盘：这就是「输出都没有」的原始配方
-  if (longRunning && hasFilter && !persisted) {
-    hits.push({
-      rule: "no-trace-long-run",
-      message:
-        "长跑命令的输出经过过滤器且没有落盘：非 tty 下 grep 会按块缓冲，" +
-        "中途你可能一行都看不到；进程若崩掉，现场也随管道消失。\n" +
-        "   改法：`… 2>&1 | tee .tmp/run.log | grep --line-buffered <模式>`" +
-        "（tee 先落盘，--line-buffered 保住实时性），或直接 `… 2>&1 | tee .tmp/run.log` 不筛。",
-    });
-  }
+  // `&&` / `||` / `;` / 换行 分隔的是独立语句；`|` 留在段内，管道才是同一件事
+  for (const statement of command.split(/&&|\|\||;|\n/u)) {
+    const seg = statement.trim();
+    if (!seg || looksShortLived(seg)) continue;
 
-  // 长跑但完全没落盘：进度看得见，但崩了没有现场
-  if (longRunning && !persisted && !hasFilter) {
-    hits.push({
-      rule: "no-log-long-run",
-      message:
-        "长跑命令没有把输出落到文件：能看到滚动，但进程一崩、会话一断，现场就没了。\n" +
-        "   改法：加 `2>&1 | tee .tmp/<名字>.log`；需要筛选时在后面再接 `| grep --line-buffered <模式>`。",
-    });
-  }
+    const longRunning = LONG_RUNNING.test(seg);
+    const hasFilter = FILTERING_TAIL.test(seg);
+    const persisted = HAS_TEE.test(seg) || HAS_REDIRECT.test(seg);
 
-  // 退出码被下游覆盖：崩溃会被当成成功
-  if (MASKS_EXIT_CODE.test(command) && !HAS_LINE_BUFFERED.test(command)) {
-    hits.push({
-      rule: "masked-exit-code",
-      message:
-        "管道最后一段是过滤器，`$?` 会变成过滤器的退出码——上游崩了也可能显示成功（实测：崩溃的 python 经 `| grep` 后退出码从 3 变成 0）。\n" +
-        "   改法：`set -o pipefail` 后接管道，或先 `… > .tmp/run.log 2>&1` 再单独检查 `$?`。",
-    });
-  }
+    // 长跑 + 过滤 + 没落盘：这就是「输出都没有」的原始配方
+    if (longRunning && hasFilter && !persisted) {
+      add({
+        rule: "no-trace-long-run",
+        message:
+          "长跑命令的输出经过过滤器且没有落盘：非 tty 下 grep 会按块缓冲，" +
+          "中途你可能一行都看不到；进程若崩掉，现场也随管道消失。\n" +
+          "   改法：`… 2>&1 | tee .tmp/run.log | grep --line-buffered <模式>`" +
+          "（tee 先落盘，--line-buffered 保住实时性），或直接 `… 2>&1 | tee .tmp/run.log` 不筛。",
+      });
+    }
 
-  // 筛掉 stderr：报错看不见
-  if (/\b2>\s*\/dev\/null\b/u.test(command) && longRunning) {
-    hits.push({
-      rule: "stderr-discarded",
-      message:
-        "长跑命令丢弃了 stderr（`2> /dev/null`）：报错与警告全部消失，失败时无从追查。\n" +
-        "   改法：`2>&1 | tee .tmp/run.log`，把 stderr 也留下。",
-    });
+    // 长跑但完全没落盘：进度看得见，但崩了没有现场
+    if (longRunning && !persisted && !hasFilter) {
+      add({
+        rule: "no-log-long-run",
+        message:
+          "长跑命令没有把输出落到文件：能看到滚动，但进程一崩、会话一断，现场就没了。\n" +
+          "   改法：加 `2>&1 | tee .tmp/<名字>.log`；需要筛选时在后面再接 `| grep --line-buffered <模式>`。",
+      });
+    }
+
+    // 退出码被下游覆盖：崩溃会被当成成功。
+    // 要求管道里确实有个非过滤器的上游——`grep x | head` 这种纯查询没有上游可丢
+    if (MASKS_EXIT_CODE.test(seg) && !HAS_LINE_BUFFERED.test(seg) && hasNonFilterUpstream(seg)) {
+      add({
+        rule: "masked-exit-code",
+        message:
+          "管道最后一段是过滤器，`$?` 会变成过滤器的退出码——上游崩了也可能显示成功（实测：崩溃的 python 经 `| grep` 后退出码从 3 变成 0）。\n" +
+          "   改法：`set -o pipefail` 后接管道，或先 `… > .tmp/run.log 2>&1` 再单独检查 `$?`。",
+      });
+    }
+
+    // 筛掉 stderr：报错看不见
+    if (/\b2>\s*\/dev\/null\b/u.test(seg) && longRunning) {
+      add({
+        rule: "stderr-discarded",
+        message:
+          "长跑命令丢弃了 stderr（`2> /dev/null`）：报错与警告全部消失，失败时无从追查。\n" +
+          "   改法：`2>&1 | tee .tmp/run.log`，把 stderr 也留下。",
+      });
+    }
   }
 
   return hits;

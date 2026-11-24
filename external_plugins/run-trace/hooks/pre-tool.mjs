@@ -62,7 +62,7 @@ function disabled() {
 }
 
 // external_plugins/run-trace/src/lib/risks.ts
-var LONG_RUNNING = /(?:^|[;&|]\s*|\bthen\s+|\bdo\s+)(?:\.\/)?(?:[\w./\\-]*[\\/])?(?:python3?(?:\.exe)?|py\.exe|node|npm|npx|pnpm|yarn|bun|deno|pytest|uv\s+(?:run|sync|pip)|pip3?|poetry|cargo|go\s+(?:run|test|build|generate)|dotnet|java|mvn|gradlew?|gradle|docker\s+(?:build|run|compose)|make|cmake|ninja|tsc|vite|webpack|next|nuxt|ollama|nvidia-smi\s+-l|git\s+clone|git\s+submodule|(?:pwsh|powershell)(?:\.exe)?\s+(?:-\w+\s+)*(?:-File|-Command))\b/iu;
+var LONG_RUNNING = /(?:^|[;&|]\s*|\bthen\s+|\bdo\s+)(?:\.\/)?(?:[\w./\\-]*[\\/])?(?:python3?(?:\.exe)?|py\.exe|node|npm|npx|pnpm|yarn|bun|deno|pytest|uv\s+(?:run|sync|pip)|pip3?|poetry|cargo|go\s+(?:run|test|build|generate)|dotnet|java|mvn|gradlew?|gradle|docker\s+(?:build|run|compose)|make|cmake|ninja|tsc|vite|webpack|next|nuxt|ollama|nvidia-smi\s+-l|git\s+clone|git\s+submodule|torchrun|deepspeed|accelerate\s+launch|ffmpeg|ffprobe|alembic\s+(?:upgrade|downgrade)|prisma\s+migrate|playwright\s+test|kubectl\s+(?:apply|delete|rollout|wait|logs\s+-f)|terraform\s+(?:apply|destroy|plan)|terragrunt\s+(?:apply|destroy|plan)|ansible-playbook|(?:pwsh|powershell)(?:\.exe)?\s+(?:-\w+\s+)*(?:-File|-Command))\b/iu;
 var FILTERING_TAIL = /\|\s*(?:grep|egrep|fgrep|rg|ag|ack|awk|sed|head|tail|sort|uniq|jq|cut|wc)\b/iu;
 var MASKS_EXIT_CODE = /\|\s*(?:grep|egrep|fgrep|rg|ag|ack|awk|sed|head|tail|sort|uniq|jq|cut|wc)\b[^|]*$/iu;
 var HAS_TEE = /\|\s*tee\b/iu;

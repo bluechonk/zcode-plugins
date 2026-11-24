@@ -27,7 +27,7 @@ export interface RiskHit {
  *   - PowerShell 侧：pwsh -File、Invoke-* 脚本、dotnet、Start-Process
  *   - 两者共用的：docker、git clone（大仓库）、pip/uv install
  */
-const LONG_RUNNING = /(?:^|[;&|]\s*|\bthen\s+|\bdo\s+)(?:\.\/)?(?:[\w./\\-]*[\\/])?(?:python3?(?:\.exe)?|py\.exe|node|npm|npx|pnpm|yarn|bun|deno|pytest|uv\s+(?:run|sync|pip)|pip3?|poetry|cargo|go\s+(?:run|test|build|generate)|dotnet|java|mvn|gradlew?|gradle|docker\s+(?:build|run|compose)|make|cmake|ninja|tsc|vite|webpack|next|nuxt|ollama|nvidia-smi\s+-l|git\s+clone|git\s+submodule|(?:pwsh|powershell)(?:\.exe)?\s+(?:-\w+\s+)*(?:-File|-Command))\b/iu;
+const LONG_RUNNING = /(?:^|[;&|]\s*|\bthen\s+|\bdo\s+)(?:\.\/)?(?:[\w./\\-]*[\\/])?(?:python3?(?:\.exe)?|py\.exe|node|npm|npx|pnpm|yarn|bun|deno|pytest|uv\s+(?:run|sync|pip)|pip3?|poetry|cargo|go\s+(?:run|test|build|generate)|dotnet|java|mvn|gradlew?|gradle|docker\s+(?:build|run|compose)|make|cmake|ninja|tsc|vite|webpack|next|nuxt|ollama|nvidia-smi\s+-l|git\s+clone|git\s+submodule|torchrun|deepspeed|accelerate\s+launch|ffmpeg|ffprobe|alembic\s+(?:upgrade|downgrade)|prisma\s+migrate|playwright\s+test|kubectl\s+(?:apply|delete|rollout|wait|logs\s+-f)|terraform\s+(?:apply|destroy|plan)|terragrunt\s+(?:apply|destroy|plan)|ansible-playbook|(?:pwsh|powershell)(?:\.exe)?\s+(?:-\w+\s+)*(?:-File|-Command))\b/iu;
 
 /** 过滤型下游：非 tty 时按块缓冲，实时性最差 */
 const FILTERING_TAIL = /\|\s*(?:grep|egrep|fgrep|rg|ag|ack|awk|sed|head|tail|sort|uniq|jq|cut|wc)\b/iu;
@@ -165,12 +165,17 @@ export function traceRisks(command: string): RiskHit[] {
 export function missingFlush(text: string, filePath: string): RiskHit | null {
   const p = filePath.replace(/\\/gu, "/").toLowerCase();
   if (!/\.(?:py|pyi)$/u.test(p)) return null;
-  const prints = text.match(/\bprint\s*\(/gu);
+
+  // 先把注释剥掉再判：注释里写 `# print(x, flush=True)` 只是笔记，
+  // 不构成任何豁免——实测踩过，它会让整个脚本被误判成「已开 flush」。
+  const code = stripPythonComments(text);
+
+  const prints = code.match(/\bprint\s*\(/gu);
   // 两处就够：循环里一条进度 + 结尾一条结果，正是最需要实时的形态
   if (!prints || prints.length < 2) return null;
-  if (/\bflush\s*=\s*True\b/u.test(text) || /sys\.stdout\.reconfigure\s*\(/u.test(text)) return null;
+  if (/\bflush\s*=\s*True\b/u.test(code) || /sys\.stdout\.reconfigure\s*\(/u.test(code)) return null;
   // 进度型脚本才会在意实时性：有循环或耗时调用
-  if (!/(?:for\s+\w+\s+in\b|while\s+|time\.sleep|\.encode\s*\(|requests\.|subprocess\.)/u.test(text)) return null;
+  if (!/(?:for\s+\w+\s+in\b|while\s+|time\.sleep|\.encode\s*\(|requests\.|subprocess\.)/u.test(code)) return null;
   return {
     rule: "py-no-flush",
     message:
@@ -179,4 +184,40 @@ export function missingFlush(text: string, filePath: string): RiskHit | null {
       "   改法：`print(..., flush=True)`，或文件头 `sys.stdout.reconfigure(line_buffering=True)`，" +
       "或运行时 `python -u`。",
   };
+}
+
+/**
+ * 剥掉 Python 注释，保留行号与字符串内容。
+ *
+ * 只处理 `#` 到行尾，且跳过字符串内部——`print("# 不是注释")` 里的 `#`
+ * 不能当注释起点，否则会把后面的代码一起吃掉。三引号块按字符串处理：
+ * 宁可少剥（漏掉块内注释），也不能把代码误当注释删掉。
+ */
+function stripPythonComments(text: string): string {
+  const out: string[] = [];
+  for (const rawLine of text.split("\n")) {
+    let inString: string | null = null;
+    let cut = rawLine.length;
+    for (let i = 0; i < rawLine.length; i += 1) {
+      const ch = rawLine[i];
+      if (inString) {
+        if (ch === "\\") {
+          i += 1;
+        } else if (ch === inString) {
+          inString = null;
+        }
+        continue;
+      }
+      if (ch === '"' || ch === "'") {
+        inString = ch;
+        continue;
+      }
+      if (ch === "#") {
+        cut = i;
+        break;
+      }
+    }
+    out.push(rawLine.slice(0, cut));
+  }
+  return out.join("\n");
 }

@@ -17,7 +17,7 @@
  */
 
 import { spawn, type ChildProcess } from "node:child_process";
-import { createWriteStream, existsSync, mkdirSync } from "node:fs";
+import { closeSync, createWriteStream, existsSync, mkdirSync, openSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 
 interface Options {
@@ -189,8 +189,35 @@ function main(): void {
     return;
   }
 
-  mkdirSync(dirname(opts.logPath), { recursive: true });
-  const log = createWriteStream(opts.logPath, { flags: "a", encoding: "utf8" });
+  // 日志必须在 spawn 之前就确认可写。
+  // 曾经的写法是 createWriteStream 后直接 spawn：路径指向目录时 EISDIR 是异步事件，
+  // 等它冒出来子进程已经在跑了，于是「命令在跑、日志一个字节没有、也没人看得见」。
+  try {
+    mkdirSync(dirname(opts.logPath), { recursive: true });
+  } catch (error) {
+    process.stderr.write(`[run-trace] 无法创建日志目录 ${dirname(opts.logPath)}：${(error as Error).message}\n`);
+    process.exitCode = 2;
+    return;
+  }
+  let log: ReturnType<typeof createWriteStream>;
+  try {
+    // openSync 在 Windows 上对目录不报错，必须显式判类型，
+    // 否则 EISDIR 会拖到流写入时才以未捕获的 error 事件冒出来
+    if (existsSync(opts.logPath) && statSync(opts.logPath).isDirectory()) {
+      throw new Error("该路径是一个目录，需要文件路径");
+    }
+    const probe = openSync(opts.logPath, "a");
+    closeSync(probe);
+    log = createWriteStream(opts.logPath, { flags: "a", encoding: "utf8" });
+    // 流的异步 error 也要兜住，否则会变成未捕获异常把进程打崩
+    log.on("error", (error) => {
+      process.stderr.write(`[run-trace] 日志写入失败：${error.message}\n`);
+    });
+  } catch (error) {
+    process.stderr.write(`[run-trace] 无法写入日志 ${opts.logPath}：${(error as Error).message}\n`);
+    process.exitCode = 2;
+    return;
+  }
 
   /** 写一行到日志并立刻刷盘：进程被强杀时，已写的内容必须还在 */
   const writeLog = (line: string): void => {
@@ -263,6 +290,36 @@ function main(): void {
   pump(child.stdout, "out", outBuf);
   pump(child.stderr, "err", errBuf);
 
+  /**
+   * 子进程退出后，管道可能还被它的子孙进程占着。
+   *
+   * 典型场景：`bash -c "sleep 60 & exit 0"` —— bash 立刻退出，但后台的 sleep
+   * 继承了 stdout/stderr 这两个管道，于是 `close` 事件要等到 sleep 结束才触发，
+   * trace 白挂一分钟（实测：`sleep 8 & exit 0` 挂满 8.16 秒）。
+   *
+   * 处理：`exit` 事件（进程本身已结束）到达后启动一个短宽限期，到点就把管道
+   * 主动销毁并收尾。宽限期用于把管道里剩余数据读干净，正常场景不受影响。
+   */
+  const PIPE_GRACE_MS = 500;
+  let finished = false;
+  let graceTimer: NodeJS.Timeout | null = null;
+
+  const finishOnce = (code: number | null, signal: NodeJS.Signals | null): void => {
+    if (finished) return;
+    finished = true;
+    if (graceTimer) clearTimeout(graceTimer);
+    finish(code, signal);
+  };
+
+  child.on("exit", (code, signal) => {
+    // 进程已退，但 close 还没来：说明管道被别的东西占着
+    graceTimer = setTimeout(() => {
+      child.stdout?.destroy();
+      child.stderr?.destroy();
+      finishOnce(code, signal);
+    }, PIPE_GRACE_MS);
+  });
+
   const finish = (code: number | null, signal: NodeJS.Signals | null): void => {
     if (timer) clearTimeout(timer);
     // 节流的省略计数要在收尾时补报，否则最后一秒被丢弃的行没人知道
@@ -300,7 +357,7 @@ function main(): void {
     });
   });
 
-  child.on("close", (code, signal) => finish(code, signal));
+  child.on("close", (code, signal) => finishOnce(code, signal));
 
   // 终端断开时也别丢现场：把已写的内容刷出去
   const onSignal = (sig: NodeJS.Signals): void => {

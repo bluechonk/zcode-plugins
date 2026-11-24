@@ -65,15 +65,44 @@ function disabled() {
 function missingFlush(text, filePath) {
   const p = filePath.replace(/\\/gu, "/").toLowerCase();
   if (!/\.(?:py|pyi)$/u.test(p)) return null;
-  const prints = text.match(/\bprint\s*\(/gu);
+  const code = stripPythonComments(text);
+  const prints = code.match(/\bprint\s*\(/gu);
   if (!prints || prints.length < 2) return null;
-  if (/\bflush\s*=\s*True\b/u.test(text) || /sys\.stdout\.reconfigure\s*\(/u.test(text)) return null;
-  if (!/(?:for\s+\w+\s+in\b|while\s+|time\.sleep|\.encode\s*\(|requests\.|subprocess\.)/u.test(text)) return null;
+  if (/\bflush\s*=\s*True\b/u.test(code) || /sys\.stdout\.reconfigure\s*\(/u.test(code)) return null;
+  if (!/(?:for\s+\w+\s+in\b|while\s+|time\.sleep|\.encode\s*\(|requests\.|subprocess\.)/u.test(code)) return null;
   return {
     rule: "py-no-flush",
     message: `\u8FD9\u4E2A Python \u811A\u672C\u6709\u591A\u5904 print\uFF08${prints.length} \u5904\uFF09\u4F46\u6CA1\u5F00 flush\uFF1A\u88AB\u7BA1\u9053\u63A5\u8D70\u65F6 python \u9ED8\u8BA4\u5757\u7F13\u51B2\uFF0C\u8FDB\u5EA6\u4F1A\u6512\u5230\u7ED3\u675F\u624D\u4E00\u6B21\u6027\u51FA\u73B0\uFF0C\u7B49\u4E8E\u770B\u4E0D\u5230\u3002
    \u6539\u6CD5\uFF1A\`print(..., flush=True)\`\uFF0C\u6216\u6587\u4EF6\u5934 \`sys.stdout.reconfigure(line_buffering=True)\`\uFF0C\u6216\u8FD0\u884C\u65F6 \`python -u\`\u3002`
   };
+}
+function stripPythonComments(text) {
+  const out = [];
+  for (const rawLine of text.split("\n")) {
+    let inString = null;
+    let cut = rawLine.length;
+    for (let i = 0; i < rawLine.length; i += 1) {
+      const ch = rawLine[i];
+      if (inString) {
+        if (ch === "\\") {
+          i += 1;
+        } else if (ch === inString) {
+          inString = null;
+        }
+        continue;
+      }
+      if (ch === '"' || ch === "'") {
+        inString = ch;
+        continue;
+      }
+      if (ch === "#") {
+        cut = i;
+        break;
+      }
+    }
+    out.push(rawLine.slice(0, cut));
+  }
+  return out.join("\n");
 }
 
 // external_plugins/run-trace/src/post-tool.ts

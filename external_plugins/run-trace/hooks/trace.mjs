@@ -4,7 +4,7 @@
 
 // external_plugins/run-trace/src/trace.ts
 import { spawn } from "node:child_process";
-import { createWriteStream, existsSync, mkdirSync } from "node:fs";
+import { closeSync, createWriteStream, existsSync, mkdirSync, openSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 var DEFAULT_TIMEOUT_SEC = 0;
 var DEFAULT_ECHO_RATE = 0;
@@ -123,8 +123,32 @@ function main() {
     process.exitCode = 2;
     return;
   }
-  mkdirSync(dirname(opts.logPath), { recursive: true });
-  const log = createWriteStream(opts.logPath, { flags: "a", encoding: "utf8" });
+  try {
+    mkdirSync(dirname(opts.logPath), { recursive: true });
+  } catch (error) {
+    process.stderr.write(`[run-trace] \u65E0\u6CD5\u521B\u5EFA\u65E5\u5FD7\u76EE\u5F55 ${dirname(opts.logPath)}\uFF1A${error.message}
+`);
+    process.exitCode = 2;
+    return;
+  }
+  let log;
+  try {
+    if (existsSync(opts.logPath) && statSync(opts.logPath).isDirectory()) {
+      throw new Error("\u8BE5\u8DEF\u5F84\u662F\u4E00\u4E2A\u76EE\u5F55\uFF0C\u9700\u8981\u6587\u4EF6\u8DEF\u5F84");
+    }
+    const probe = openSync(opts.logPath, "a");
+    closeSync(probe);
+    log = createWriteStream(opts.logPath, { flags: "a", encoding: "utf8" });
+    log.on("error", (error) => {
+      process.stderr.write(`[run-trace] \u65E5\u5FD7\u5199\u5165\u5931\u8D25\uFF1A${error.message}
+`);
+    });
+  } catch (error) {
+    process.stderr.write(`[run-trace] \u65E0\u6CD5\u5199\u5165\u65E5\u5FD7 ${opts.logPath}\uFF1A${error.message}
+`);
+    process.exitCode = 2;
+    return;
+  }
   const writeLog = (line) => {
     log.write(`${line}
 `);
@@ -168,6 +192,22 @@ function main() {
   const errBuf = { rest: "" };
   pump(child.stdout, "out", outBuf);
   pump(child.stderr, "err", errBuf);
+  const PIPE_GRACE_MS = 500;
+  let finished = false;
+  let graceTimer = null;
+  const finishOnce = (code, signal) => {
+    if (finished) return;
+    finished = true;
+    if (graceTimer) clearTimeout(graceTimer);
+    finish(code, signal);
+  };
+  child.on("exit", (code, signal) => {
+    graceTimer = setTimeout(() => {
+      child.stdout?.destroy();
+      child.stderr?.destroy();
+      finishOnce(code, signal);
+    }, PIPE_GRACE_MS);
+  });
   const finish = (code, signal) => {
     if (timer) clearTimeout(timer);
     echo.flush();
@@ -200,7 +240,7 @@ function main() {
       process.exitCode = 1;
     });
   });
-  child.on("close", (code, signal) => finish(code, signal));
+  child.on("close", (code, signal) => finishOnce(code, signal));
   const onSignal = (sig) => {
     writeLog(`# [${ts()}] \u6536\u5230 ${sig}\uFF0C\u8F6C\u53D1\u7ED9\u5B50\u8FDB\u7A0B`);
     child.kill(sig);

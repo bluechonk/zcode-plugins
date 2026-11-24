@@ -30,12 +30,14 @@ function runHook(entry, input) {
   return (r.stdout ?? "").trim();
 }
 
+// 每次运行换会话号：插件按「会话 + 规则 + 文件」去重，复用同一批 id 会被上一次结果吞掉
+const RUN = Date.now();
 let seq = 0;
 function bash(command) {
   seq += 1;
   return runHook("pre-tool.mjs", {
     hook_event_name: "PreToolUse",
-    session_id: `rg-test-${seq}`,
+    session_id: `rg-test-${RUN}-${seq}`,
     tool_name: "Bash",
     tool_input: { command },
   });
@@ -45,7 +47,7 @@ function writePre(file, content) {
   seq += 1;
   return runHook("pre-tool.mjs", {
     hook_event_name: "PreToolUse",
-    session_id: `rg-test-p${seq}`,
+    session_id: `rg-test-${RUN}-p${seq}`,
     tool_name: "Write",
     tool_input: { file_path: `C:/tmp/${file}`, content },
   });
@@ -54,7 +56,7 @@ function write(file, content) {
   seq += 1;
   return runHook("post-tool.mjs", {
     hook_event_name: "PostToolUse",
-    session_id: `rg-test-w${seq}`,
+    session_id: `rg-test-${RUN}-w${seq}`,
     tool_name: "Write",
     tool_input: { file_path: `C:/tmp/${file}`, content },
   });

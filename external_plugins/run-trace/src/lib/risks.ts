@@ -87,8 +87,11 @@ const looksShortLived = (command: string): boolean => {
  */
 export function traceRisks(command: string): RiskHit[] {
   if (!command.trim()) return [];
-  if (looksShortLived(command)) return [];
 
+  // 这里刻意不做「整条命令像短命令就直接返回」的快捷判断。
+  // looksShortLived 的锚点在命令开头，而 `grep … && python train.py` 这种
+  // 「查询 + 长跑」组合会被首段命中而整条放过，后半段的长跑风险就漏了
+  // （实测：这条命令返回空数组）。判短命令只按语句逐段做，见循环内。
   const hits: RiskHit[] = [];
   const seen = new Set<string>();
   const add = (hit: RiskHit): void => {

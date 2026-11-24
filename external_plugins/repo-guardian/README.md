@@ -173,7 +173,7 @@ npm run sync:local
 
 **CRLF 判定**：取 `git ls-files --eol` 的**索引侧**（`i/crlf`），不看工作树侧。工作树里出现 CRLF 可能只是本机 `core.autocrlf` 的结果，而规则管的是「仓库内文本文件一律 LF」。`i/-text` 是二进制，不参与判定。`-z` 记录里 `attr/` 字段本身可以含空格（`attr/text=auto eol=lf`），所以字段边界只能按制表符切，按空白 split 会错取路径。
 
-**凭据形态**：只收「一看就是凭据」的名字——`.env`、`.env.local`/`.prod` 之类、`*.pem`/`*.key`/`*.p12`/`*.pfx`/`*.jks`/`*.keystore`、`id_rsa`/`id_ed2519`、`.htpasswd`、`credentials`、`service-account*.json`、`secrets*.yaml`。不收 `config.json` 这类宽泛名字：误报率太高，报一次就要模型花一轮去解释。`.env.example` / `.env.sample` / `.env.template` / `.env.dist` 是模板，明确排除。
+**凭据形态**：只收「一看就是凭据」的名字——`.env`、`.env.local`/`.prod` 之类、`*.pem`/`*.key`/`*.p12`/`*.pfx`/`*.jks`/`*.keystore`、`id_rsa`/`id_ed25519`、`.htpasswd`、`credentials`、`service-account*.json`、`secrets*.yaml`。不收 `config.json` 这类宽泛名字：误报率太高，报一次就要模型花一轮去解释。`.env.example` / `.env.sample` / `.env.template` / `.env.dist` 是模板，明确排除。
 
 **「未覆盖的凭据文件」**用 `git ls-files --others --exclude-standard` 取：被 `.gitignore` 盖住的不会出现在结果里，于是「出现在这里」等价于「没被忽略、随时会被顺手提交」。已入库的凭据与裸奔的凭据分开报——前者要清历史并轮换，后者只要补忽略规则，处置代价差一个量级。
 

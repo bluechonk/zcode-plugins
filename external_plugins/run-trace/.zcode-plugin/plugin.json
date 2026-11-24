@@ -1,0 +1,23 @@
+{
+  "name": "run-trace",
+  "version": "0.1.0",
+  "description": "Keep long-running commands observable: trace runner writes a live log line by line while streaming to the terminal, and hooks flag commands whose output or exit code would be lost.",
+  "description_i18n": {
+    "en": "Keep long-running commands observable: trace runner writes a live log line by line while streaming to the terminal, and hooks flag commands whose output or exit code would be lost.",
+    "zh-CN": "让长跑命令始终可观测：trace 运行器边跑边落盘同时实时回显，hook 拦住输出或退出码会丢失的写法。"
+  },
+  "author": {
+    "name": "bluechonk",
+    "url": "https://github.com/bluechonk"
+  },
+  "repository": "https://github.com/bluechonk/zcode-plugins",
+  "license": "MIT",
+  "keywords": [
+    "hooks",
+    "logging",
+    "observability",
+    "trace",
+    "long-running"
+  ],
+  "skills": "./skills"
+}

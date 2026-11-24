@@ -85,7 +85,6 @@ var looksShortLived = (command) => {
 };
 function traceRisks(command) {
   if (!command.trim()) return [];
-  if (looksShortLived(command)) return [];
   const hits = [];
   const seen = /* @__PURE__ */ new Set();
   const add = (hit) => {

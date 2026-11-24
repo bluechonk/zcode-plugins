@@ -100,6 +100,33 @@
       ]
     },
     {
+      "name": "run-trace",
+      "source": "./external_plugins/run-trace",
+      "version": "0.1.0",
+      "description": "Keep long-running commands observable: trace runner writes a live log line by line while streaming to the terminal, and hooks flag commands whose output or exit code would be lost.",
+      "description_i18n": {
+        "en": "Keep long-running commands observable: trace runner writes a live log line by line while streaming to the terminal, and hooks flag commands whose output or exit code would be lost.",
+        "zh-CN": "让长跑命令始终可观测：trace 运行器边跑边落盘同时实时回显，hook 拦住输出或退出码会丢失的写法。"
+      },
+      "displayName": "Run Trace",
+      "displayName_i18n": {
+        "en": "Run Trace",
+        "zh-CN": "长跑追踪"
+      },
+      "author": {
+        "name": "bluechonk",
+        "url": "https://github.com/bluechonk"
+      },
+      "category": "developer-tools",
+      "tags": [
+        "hooks",
+        "logging",
+        "observability",
+        "trace",
+        "long-running"
+      ]
+    },
+    {
       "name": "repo-guardian",
       "source": "./external_plugins/repo-guardian",
       "version": "0.1.5",

@@ -1,17 +1,16 @@
 /**
- * UserPromptSubmit：记下本轮起点，并检查审查配置是否可用。
+ * UserPromptSubmit：记下本轮起点。
  *
  * 一个用户消息算一轮。这里抓一份工作树快照作为基线，Stop 时据此只审本轮改动；
  * 同时把 Stop 的阻塞计数清零，避免上一轮的额度泄漏到这一轮。
  *
- * 配置检查是补可观测性：模型配置读不到时 Stop 会静默跳过审查，
- * 而「静默」正是这个插件失效十几天没人发现的原因。这里每会话只报一次。
+ * 配置可用性不在这里查：这一刻会话库还没有本轮的 assistant_response，
+ * user_prompt 也未必落库，查必然读空——实测每个会话首轮都误报一次
+ * 「读不到模型配置」。配置检查移到 Stop，那时数据一定齐。
  */
 
-import { disabled, emit, readHookInput, readState, writeState } from "./lib/hook";
+import { disabled, readHookInput, writeState } from "./lib/hook";
 import { captureBaseline, isRepo } from "./lib/git";
-import { readPrefs } from "./lib/prefs";
-import { resolveSessionConfig } from "./lib/review";
 
 async function main(): Promise<void> {
   if (disabled()) return;
@@ -28,21 +27,6 @@ async function main(): Promise<void> {
   const sessionId = input.session_id ?? "default";
   writeState(sessionId, "baseline", { sha, cwd, at: new Date().toISOString() });
   writeState(sessionId, "stop", { blocks: 0 });
-
-  // 审查关着就不必再查配置：查了也没用，只会每会话多一条噪音
-  if (!readPrefs().llmReview) return;
-
-  const state = readState<{ configWarned?: boolean }>(sessionId, "config", {});
-  if (state.configWarned) return;
-  if (resolveSessionConfig(sessionId)) return;
-
-  writeState(sessionId, "config", { configWarned: true });
-  emit("UserPromptSubmit", {
-    additionalContext:
-      "[security-review] 读不到本会话的模型配置，本轮的安全审查已跳过。\n" +
-      "需要会话库里有 providerId + modelId，且 ~/.zcode/v2/provider_config.json 里\n" +
-      "配好该 provider 的 baseUrl 与 api-key。审查不发请求比发错请求好，但要知道它没跑。",
-  });
 }
 
 main()

@@ -110,7 +110,7 @@ function bashChineseStdout(command) {
   }
   return false;
 }
-var CREDENTIAL_NAME = /(?:^|\/)(?:\.env\.(?:local|dev|development|prod|production|test|ci|stage|staging)$|\.env$|[^/]*\.(?:pem|key|p12|pfx|jks|keystore|kdbx)$|id_rsa(?:$|[._2]|\.pub)|id_ed2519(?:$|[._2])|\.htpasswd$|credentials$|service-account(?:[-.][^/]*)?\.json$|secrets?\.ya?ml$)/iu;
+var CREDENTIAL_NAME = /(?:^|\/)(?:\.env\.(?:local|dev|development|prod|production|test|ci|stage|staging)$|\.env$|[^/]*\.(?:pem|key|p12|pfx|jks|keystore|kdbx)$|id_rsa(?:$|[._2]|\.pub)|id_ed25519(?:$|[._2])|\.htpasswd$|credentials$|service-account(?:[-.][^/]*)?\.json$|secrets?\.ya?ml$)/iu;
 var CREDENTIAL_TEMPLATE = /(?:^|\/)\.env\.(?:example|sample|template|dist)$/iu;
 function isCredentialPath(filePath) {
   const p = filePath.replace(/\\/gu, "/");
@@ -140,24 +140,26 @@ function analyzeGitCommand(command) {
     forcePush: false,
     historyRewrite: false
   };
+  let commit = false;
+  let add = false;
+  let push = false;
   for (const seg of segments(command)) {
     const rest = gitSubcommand(seg);
     if (!rest || rest.length === 0) continue;
     const sub = rest[0] ?? "";
     if (sub === "commit") {
-      info.intent = info.intent ?? "commit";
+      commit = true;
     } else if (sub === "add") {
-      info.intent = info.intent ?? "add";
+      add = true;
       if (rest.some((t) => t === "-f" || t === "--force")) info.forceAdd = true;
       for (const t of rest.slice(1)) if (!t.startsWith("-")) info.addTargets.push(t);
     } else if (sub === "push") {
-      info.intent = info.intent ?? "push";
+      push = true;
       if (rest.some((t) => t === "-f" || t === "--force" || t === "--force-with-lease=false")) {
         info.forcePush = true;
       }
     } else if (sub === "filter-branch" || sub === "filter-repo") {
       info.historyRewrite = true;
-      info.intent = info.intent ?? "history-rewrite";
     }
   }
   for (const seg of segments(command)) {
@@ -168,7 +170,7 @@ function analyzeGitCommand(command) {
     }
   }
   if (!info.historyRewrite && /bfg[\w.-]*\.jar/iu.test(command)) info.historyRewrite = true;
-  if (info.historyRewrite) info.intent = info.intent ?? "history-rewrite";
+  info.intent = commit ? "commit" : add ? "add" : push ? "push" : info.historyRewrite ? "history-rewrite" : null;
   return info;
 }
 

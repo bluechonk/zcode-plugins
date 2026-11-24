@@ -1,6 +1,6 @@
 {
   "name": "repo-guardian",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "Repository health checks and local rule enforcement: CI presence, LF and .gitattributes, credentials and build artifacts kept out of the repo, the pre-commit self-check, forbidden commands, emoji and temp-file placement, plus code and comment rule lint after every write.",
   "description_i18n": {
     "en": "Repository health checks and local rule enforcement: CI presence, LF and .gitattributes, credentials and build artifacts kept out of the repo, the pre-commit self-check, forbidden commands, emoji and temp-file placement, plus code and comment rule lint after every write.",

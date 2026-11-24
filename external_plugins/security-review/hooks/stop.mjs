@@ -26,6 +26,9 @@ async function readHookInput() {
     return null;
   }
 }
+function emit(hookEventName, inner) {
+  process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName, ...inner } }));
+}
 function emitStopBlock(reason) {
   process.stdout.write(JSON.stringify({ decision: "block", reason }));
 }
@@ -337,6 +340,13 @@ async function main() {
   if (!diff.text.trim() || diff.files === 0) return;
   const config = resolveSessionConfig(sessionId);
   if (!config) {
+    const state2 = readState(sessionId, "config", {});
+    if (!state2.configWarned) {
+      writeState(sessionId, "config", { ...state2, configWarned: true });
+      emit("Stop", {
+        additionalContext: "[security-review] \u8BFB\u4E0D\u5230\u672C\u4F1A\u8BDD\u7684\u6A21\u578B\u914D\u7F6E\uFF0C\u672C\u8F6E\u6539\u52A8\u7684\u5B89\u5168\u5BA1\u67E5\u5DF2\u8DF3\u8FC7\u3002\n\u9700\u8981\u4F1A\u8BDD\u5E93\u91CC\u6709 providerId + modelId\uFF0C\u4E14 ~/.zcode/v2/provider_config.json \u91CC\n\u914D\u597D\u8BE5 provider \u7684 baseUrl \u4E0E api-key\u3002\u5BA1\u67E5\u4E0D\u53D1\u8BF7\u6C42\u6BD4\u53D1\u9519\u8BF7\u6C42\u597D\uFF0C\u4F46\u8981\u77E5\u9053\u5B83\u6CA1\u8DD1\u3002"
+      });
+    }
     return;
   }
   const outcome = await reviewDiff({

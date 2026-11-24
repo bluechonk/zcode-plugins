@@ -12,7 +12,7 @@
  * 读不到就跳过，绝不猜一个地址发出去。
  */
 
-import { disabled, emitStopBlock, envInt, readHookInput, readState, writeState } from "./lib/hook";
+import { disabled, emit, emitStopBlock, envInt, readHookInput, readState, writeState } from "./lib/hook";
 import { captureBaseline, diffSince } from "./lib/git";
 import { readPrefs } from "./lib/prefs";
 import { resolveSessionConfig, reviewDiff, type Finding } from "./lib/review";
@@ -65,7 +65,18 @@ async function main(): Promise<void> {
   const config = resolveSessionConfig(sessionId);
   if (!config) {
     // 读不到会话的模型配置（会话库不可读 / 该 provider 没配接入点）就跳过。
-    // 不提示：每轮都塞一行噪音比跳过更糟；配置问题由 SessionStart 那边报。
+    // 这里提示一次：Stop 时 assistant_response 一定已落库，读不到就是真读不到，
+    // 不再是 UserPromptSubmit 那一刻的时序竞态。每会话只报一次，避免刷屏。
+    const state = readState<{ configWarned?: boolean }>(sessionId, "config", {});
+    if (!state.configWarned) {
+      writeState(sessionId, "config", { ...state, configWarned: true });
+      emit("Stop", {
+        additionalContext:
+          "[security-review] 读不到本会话的模型配置，本轮改动的安全审查已跳过。\n" +
+          "需要会话库里有 providerId + modelId，且 ~/.zcode/v2/provider_config.json 里\n" +
+          "配好该 provider 的 baseUrl 与 api-key。审查不发请求比发错请求好，但要知道它没跑。",
+      });
+    }
     return;
   }
 

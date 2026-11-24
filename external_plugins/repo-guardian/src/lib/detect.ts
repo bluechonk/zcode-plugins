@@ -147,7 +147,7 @@ export function bashChineseStdout(command: string): boolean {
  * `.env.example` / `.env.sample` / `.env.template` 是模板，明确排除。
  */
 const CREDENTIAL_NAME =
-  /(?:^|\/)(?:\.env\.(?:local|dev|development|prod|production|test|ci|stage|staging)$|\.env$|[^/]*\.(?:pem|key|p12|pfx|jks|keystore|kdbx)$|id_rsa(?:$|[._2]|\.pub)|id_ed2519(?:$|[._2])|\.htpasswd$|credentials$|service-account(?:[-.][^/]*)?\.json$|secrets?\.ya?ml$)/iu;
+  /(?:^|\/)(?:\.env\.(?:local|dev|development|prod|production|test|ci|stage|staging)$|\.env$|[^/]*\.(?:pem|key|p12|pfx|jks|keystore|kdbx)$|id_rsa(?:$|[._2]|\.pub)|id_ed25519(?:$|[._2])|\.htpasswd$|credentials$|service-account(?:[-.][^/]*)?\.json$|secrets?\.ya?ml$)/iu;
 const CREDENTIAL_TEMPLATE = /(?:^|\/)\.env\.(?:example|sample|template|dist)$/iu;
 
 export function isCredentialPath(filePath: string): boolean {
@@ -210,25 +210,30 @@ export function analyzeGitCommand(command: string): GitCommandInfo {
     historyRewrite: false,
   };
 
+  // 意图按「提交 > 暂存 > 推送 > 改写历史」定优先级，且与出现顺序无关：
+  // `git add .env && git commit -m x` 里确实要提交，不能因为 add 在前就只提示 add。
+  let commit = false;
+  let add = false;
+  let push = false;
+
   for (const seg of segments(command)) {
     const rest = gitSubcommand(seg);
     if (!rest || rest.length === 0) continue;
     const sub = rest[0] ?? "";
 
     if (sub === "commit") {
-      info.intent = info.intent ?? "commit";
+      commit = true;
     } else if (sub === "add") {
-      info.intent = info.intent ?? "add";
+      add = true;
       if (rest.some((t) => t === "-f" || t === "--force")) info.forceAdd = true;
       for (const t of rest.slice(1)) if (!t.startsWith("-")) info.addTargets.push(t);
     } else if (sub === "push") {
-      info.intent = info.intent ?? "push";
+      push = true;
       if (rest.some((t) => t === "-f" || t === "--force" || t === "--force-with-lease=false")) {
         info.forcePush = true;
       }
     } else if (sub === "filter-branch" || sub === "filter-repo") {
       info.historyRewrite = true;
-      info.intent = info.intent ?? "history-rewrite";
     }
   }
 
@@ -242,7 +247,8 @@ export function analyzeGitCommand(command: string): GitCommandInfo {
     }
   }
   if (!info.historyRewrite && /bfg[\w.-]*\.jar/iu.test(command)) info.historyRewrite = true;
-  if (info.historyRewrite) info.intent = info.intent ?? "history-rewrite";
+
+  info.intent = commit ? "commit" : add ? "add" : push ? "push" : info.historyRewrite ? "history-rewrite" : null;
 
   return info;
 }

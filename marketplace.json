@@ -62,7 +62,7 @@
         "url": "https://github.com/bluechonk"
       },
       "category": "utilities",
-      "icon": "https://raw.githubusercontent.com/bluechonk/zcode-plugins/main/assets/plan-with-files/icon.png",
+      "icon": "https://raw.githubusercontent.com/bluechonk/zcode-plugins/main/assets/todo-guard/icon.png",
       "tags": [
         "hooks",
         "todo",
@@ -124,7 +124,8 @@
         "observability",
         "trace",
         "long-running"
-      ]
+      ],
+      "icon": "https://raw.githubusercontent.com/bluechonk/zcode-plugins/main/assets/run-trace/icon.png"
     },
     {
       "name": "repo-guardian",
@@ -175,7 +176,8 @@
       "displayName_i18n": {
         "zh-CN": "PUA 生产力教练",
         "en": "PUA Coaching"
-      }
+      },
+      "icon": "https://raw.githubusercontent.com/bluechonk/zcode-plugins/main/assets/pua-bridge/icon.png"
     },
     {
       "name": "dev-flow",
@@ -198,7 +200,8 @@
       "displayName_i18n": {
         "zh-CN": "探索式开发收口流程",
         "en": "Dev Flow Wrap-up"
-      }
+      },
+      "icon": "https://raw.githubusercontent.com/bluechonk/zcode-plugins/main/assets/dev-flow/icon.png"
     }
   ]
 }

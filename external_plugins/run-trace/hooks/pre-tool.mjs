@@ -68,43 +68,61 @@ var MASKS_EXIT_CODE = /\|\s*(?:grep|egrep|fgrep|rg|ag|ack|awk|sed|head|tail|sort
 var HAS_TEE = /\|\s*tee\b/iu;
 var HAS_LINE_BUFFERED = /--line-buffered\b/iu;
 var HAS_REDIRECT = />{1,2}\s*(?!&)\S/u;
+function hasNonFilterUpstream(segment) {
+  const first = segment.split("|")[0]?.trim() ?? "";
+  if (!first) return false;
+  return !/^(?:grep|egrep|fgrep|rg|ag|ack|awk|sed|head|tail|sort|uniq|jq|cut|wc)\b/u.test(first);
+}
 var looksShortLived = (command) => {
   const trimmed = command.trim();
   if (trimmed.length > 400) return false;
-  return /^(?:git\s+(?:status|log|diff|show|branch|remote|rev-parse)|ls|cat|head|tail|echo|printf|which|where|node\s+-v|npm\s+-v|python3?\s+--version|pwd|cd|mkdir|rm|cp|mv|touch)\b/u.test(
+  if (/^(?:git\s+(?:status|log|diff|show|branch|remote|rev-parse|ls-files)|ls|cat|head|tail|echo|printf|which|where|node\s+-v|npm\s+-v|python3?\s+--version|pwd|cd|mkdir|rm|cp|mv|touch|grep|rg|ag|ack|find|wc|sort|uniq|jq)\b/u.test(
     trimmed
-  );
+  )) {
+    return true;
+  }
+  return /^(?:node|python3?)\s+-[ec]\b/u.test(trimmed);
 };
 function traceRisks(command) {
   if (!command.trim()) return [];
   if (looksShortLived(command)) return [];
   const hits = [];
-  const longRunning = LONG_RUNNING.test(command);
-  const hasFilter = FILTERING_TAIL.test(command);
-  const persisted = HAS_TEE.test(command) || HAS_REDIRECT.test(command);
-  if (longRunning && hasFilter && !persisted) {
-    hits.push({
-      rule: "no-trace-long-run",
-      message: "\u957F\u8DD1\u547D\u4EE4\u7684\u8F93\u51FA\u7ECF\u8FC7\u8FC7\u6EE4\u5668\u4E14\u6CA1\u6709\u843D\u76D8\uFF1A\u975E tty \u4E0B grep \u4F1A\u6309\u5757\u7F13\u51B2\uFF0C\u4E2D\u9014\u4F60\u53EF\u80FD\u4E00\u884C\u90FD\u770B\u4E0D\u5230\uFF1B\u8FDB\u7A0B\u82E5\u5D29\u6389\uFF0C\u73B0\u573A\u4E5F\u968F\u7BA1\u9053\u6D88\u5931\u3002\n   \u6539\u6CD5\uFF1A`\u2026 2>&1 | tee .tmp/run.log | grep --line-buffered <\u6A21\u5F0F>`\uFF08tee \u5148\u843D\u76D8\uFF0C--line-buffered \u4FDD\u4F4F\u5B9E\u65F6\u6027\uFF09\uFF0C\u6216\u76F4\u63A5 `\u2026 2>&1 | tee .tmp/run.log` \u4E0D\u7B5B\u3002"
-    });
-  }
-  if (longRunning && !persisted && !hasFilter) {
-    hits.push({
-      rule: "no-log-long-run",
-      message: "\u957F\u8DD1\u547D\u4EE4\u6CA1\u6709\u628A\u8F93\u51FA\u843D\u5230\u6587\u4EF6\uFF1A\u80FD\u770B\u5230\u6EDA\u52A8\uFF0C\u4F46\u8FDB\u7A0B\u4E00\u5D29\u3001\u4F1A\u8BDD\u4E00\u65AD\uFF0C\u73B0\u573A\u5C31\u6CA1\u4E86\u3002\n   \u6539\u6CD5\uFF1A\u52A0 `2>&1 | tee .tmp/<\u540D\u5B57>.log`\uFF1B\u9700\u8981\u7B5B\u9009\u65F6\u5728\u540E\u9762\u518D\u63A5 `| grep --line-buffered <\u6A21\u5F0F>`\u3002"
-    });
-  }
-  if (MASKS_EXIT_CODE.test(command) && !HAS_LINE_BUFFERED.test(command)) {
-    hits.push({
-      rule: "masked-exit-code",
-      message: "\u7BA1\u9053\u6700\u540E\u4E00\u6BB5\u662F\u8FC7\u6EE4\u5668\uFF0C`$?` \u4F1A\u53D8\u6210\u8FC7\u6EE4\u5668\u7684\u9000\u51FA\u7801\u2014\u2014\u4E0A\u6E38\u5D29\u4E86\u4E5F\u53EF\u80FD\u663E\u793A\u6210\u529F\uFF08\u5B9E\u6D4B\uFF1A\u5D29\u6E83\u7684 python \u7ECF `| grep` \u540E\u9000\u51FA\u7801\u4ECE 3 \u53D8\u6210 0\uFF09\u3002\n   \u6539\u6CD5\uFF1A`set -o pipefail` \u540E\u63A5\u7BA1\u9053\uFF0C\u6216\u5148 `\u2026 > .tmp/run.log 2>&1` \u518D\u5355\u72EC\u68C0\u67E5 `$?`\u3002"
-    });
-  }
-  if (/\b2>\s*\/dev\/null\b/u.test(command) && longRunning) {
-    hits.push({
-      rule: "stderr-discarded",
-      message: "\u957F\u8DD1\u547D\u4EE4\u4E22\u5F03\u4E86 stderr\uFF08`2> /dev/null`\uFF09\uFF1A\u62A5\u9519\u4E0E\u8B66\u544A\u5168\u90E8\u6D88\u5931\uFF0C\u5931\u8D25\u65F6\u65E0\u4ECE\u8FFD\u67E5\u3002\n   \u6539\u6CD5\uFF1A`2>&1 | tee .tmp/run.log`\uFF0C\u628A stderr \u4E5F\u7559\u4E0B\u3002"
-    });
+  const seen = /* @__PURE__ */ new Set();
+  const add = (hit) => {
+    if (seen.has(hit.rule)) return;
+    seen.add(hit.rule);
+    hits.push(hit);
+  };
+  for (const statement of command.split(/&&|\|\||;|\n/u)) {
+    const seg = statement.trim();
+    if (!seg || looksShortLived(seg)) continue;
+    const longRunning = LONG_RUNNING.test(seg);
+    const hasFilter = FILTERING_TAIL.test(seg);
+    const persisted = HAS_TEE.test(seg) || HAS_REDIRECT.test(seg);
+    if (longRunning && hasFilter && !persisted) {
+      add({
+        rule: "no-trace-long-run",
+        message: "\u957F\u8DD1\u547D\u4EE4\u7684\u8F93\u51FA\u7ECF\u8FC7\u8FC7\u6EE4\u5668\u4E14\u6CA1\u6709\u843D\u76D8\uFF1A\u975E tty \u4E0B grep \u4F1A\u6309\u5757\u7F13\u51B2\uFF0C\u4E2D\u9014\u4F60\u53EF\u80FD\u4E00\u884C\u90FD\u770B\u4E0D\u5230\uFF1B\u8FDB\u7A0B\u82E5\u5D29\u6389\uFF0C\u73B0\u573A\u4E5F\u968F\u7BA1\u9053\u6D88\u5931\u3002\n   \u6539\u6CD5\uFF1A`\u2026 2>&1 | tee .tmp/run.log | grep --line-buffered <\u6A21\u5F0F>`\uFF08tee \u5148\u843D\u76D8\uFF0C--line-buffered \u4FDD\u4F4F\u5B9E\u65F6\u6027\uFF09\uFF0C\u6216\u76F4\u63A5 `\u2026 2>&1 | tee .tmp/run.log` \u4E0D\u7B5B\u3002"
+      });
+    }
+    if (longRunning && !persisted && !hasFilter) {
+      add({
+        rule: "no-log-long-run",
+        message: "\u957F\u8DD1\u547D\u4EE4\u6CA1\u6709\u628A\u8F93\u51FA\u843D\u5230\u6587\u4EF6\uFF1A\u80FD\u770B\u5230\u6EDA\u52A8\uFF0C\u4F46\u8FDB\u7A0B\u4E00\u5D29\u3001\u4F1A\u8BDD\u4E00\u65AD\uFF0C\u73B0\u573A\u5C31\u6CA1\u4E86\u3002\n   \u6539\u6CD5\uFF1A\u52A0 `2>&1 | tee .tmp/<\u540D\u5B57>.log`\uFF1B\u9700\u8981\u7B5B\u9009\u65F6\u5728\u540E\u9762\u518D\u63A5 `| grep --line-buffered <\u6A21\u5F0F>`\u3002"
+      });
+    }
+    if (MASKS_EXIT_CODE.test(seg) && !HAS_LINE_BUFFERED.test(seg) && hasNonFilterUpstream(seg)) {
+      add({
+        rule: "masked-exit-code",
+        message: "\u7BA1\u9053\u6700\u540E\u4E00\u6BB5\u662F\u8FC7\u6EE4\u5668\uFF0C`$?` \u4F1A\u53D8\u6210\u8FC7\u6EE4\u5668\u7684\u9000\u51FA\u7801\u2014\u2014\u4E0A\u6E38\u5D29\u4E86\u4E5F\u53EF\u80FD\u663E\u793A\u6210\u529F\uFF08\u5B9E\u6D4B\uFF1A\u5D29\u6E83\u7684 python \u7ECF `| grep` \u540E\u9000\u51FA\u7801\u4ECE 3 \u53D8\u6210 0\uFF09\u3002\n   \u6539\u6CD5\uFF1A`set -o pipefail` \u540E\u63A5\u7BA1\u9053\uFF0C\u6216\u5148 `\u2026 > .tmp/run.log 2>&1` \u518D\u5355\u72EC\u68C0\u67E5 `$?`\u3002"
+      });
+    }
+    if (/\b2>\s*\/dev\/null\b/u.test(seg) && longRunning) {
+      add({
+        rule: "stderr-discarded",
+        message: "\u957F\u8DD1\u547D\u4EE4\u4E22\u5F03\u4E86 stderr\uFF08`2> /dev/null`\uFF09\uFF1A\u62A5\u9519\u4E0E\u8B66\u544A\u5168\u90E8\u6D88\u5931\uFF0C\u5931\u8D25\u65F6\u65E0\u4ECE\u8FFD\u67E5\u3002\n   \u6539\u6CD5\uFF1A`2>&1 | tee .tmp/run.log`\uFF0C\u628A stderr \u4E5F\u7559\u4E0B\u3002"
+      });
+    }
   }
   return hits;
 }
